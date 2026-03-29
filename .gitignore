@@ -1,0 +1,13 @@
+build/
+cmake-build-*/
+.DS_Store
+*.user
+*.suo
+.idea/
+.vs/
+.vscode/
+*.xcuserdata
+.claude/
+.cursor/
+.copilot/
+.aider*

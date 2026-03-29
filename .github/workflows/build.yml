@@ -1,0 +1,71 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libasound2-dev
+          libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev
+          libfreetype-dev libfontconfig1-dev
+          libgl1-mesa-dev
+          libwebkit2gtk-4.1-dev
+          libcurl4-openssl-dev
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v6
+        with:
+          name: Cartridge-VST3-${{ matrix.name }}
+          path: build/Cartridge_artefacts/Release/VST3/
+
+      - name: Upload CLAP
+        uses: actions/upload-artifact@v6
+        with:
+          name: Cartridge-CLAP-${{ matrix.name }}
+          path: build/Cartridge_artefacts/Release/CLAP/
+
+      - name: Upload AU (macOS only)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v6
+        with:
+          name: Cartridge-AU-macOS
+          path: build/Cartridge_artefacts/Release/AU/
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v6
+        with:
+          name: Cartridge-Standalone-${{ matrix.name }}
+          path: build/Cartridge_artefacts/Release/Standalone/

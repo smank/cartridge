@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+
+    runs-on: ${{ matrix.os }}
+    name: Build ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libasound2-dev
+          libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev
+          libfreetype-dev libfontconfig1-dev
+          libgl1-mesa-dev
+          libwebkit2gtk-4.1-dev
+          libcurl4-openssl-dev
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p staging
+          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
+          cp -R build/Cartridge_artefacts/Release/AU/ staging/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
+          ditto -c -k --keepParent staging Cartridge-macOS.zip
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p staging
+          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
+          cd staging && 7z a ../Cartridge-Windows.zip .
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p staging
+          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
+          cd staging && zip -r ../Cartridge-Linux.zip .
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@v6
+        with:
+          name: Cartridge-${{ matrix.name }}
+          path: Cartridge-${{ matrix.name }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v6
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: artifacts/**/*.zip
