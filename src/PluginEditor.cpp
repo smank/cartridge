@@ -46,6 +46,8 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     keyboard.setKeyWidth (24.0f);
     keyboard.setMidiChannel (1);
     keyboard.setAvailableRange (36, 96); // C2 to C7 (~5 octaves)
+    keyboard.setKeyPressBaseOctave (5);  // QWERTY keys start at C4 (middle C)
+    keyboard.setVelocity (0.8f, true);   // QWERTY velocity; mouse uses click position
 
     addAndMakeVisible (topBar);
     addAndMakeVisible (channelStrips);
@@ -163,8 +165,8 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
-    // Ctrl+Z = Octave down (plain Z is a piano key)
-    if ((keyCode == 'Z' || keyCode == 'z') && key.getModifiers().isCommandDown())
+    // [ = Octave down
+    if (keyCode == '[')
     {
         if (currentOctaveOffset > -3)
         {
@@ -172,12 +174,13 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
             int low  = 36 + currentOctaveOffset * 12;
             int high = 96 + currentOctaveOffset * 12;
             keyboard.setAvailableRange (juce::jmax (0, low), juce::jmin (127, high));
+            keyboard.setKeyPressBaseOctave (5 + currentOctaveOffset);
         }
         return true;
     }
 
-    // Ctrl+X = Octave up (plain X is a piano key)
-    if ((keyCode == 'X' || keyCode == 'x') && key.getModifiers().isCommandDown())
+    // ] = Octave up
+    if (keyCode == ']')
     {
         if (currentOctaveOffset < 2)
         {
@@ -185,7 +188,46 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
             int low  = 36 + currentOctaveOffset * 12;
             int high = 96 + currentOctaveOffset * 12;
             keyboard.setAvailableRange (juce::jmax (0, low), juce::jmin (127, high));
+            keyboard.setKeyPressBaseOctave (5 + currentOctaveOffset);
         }
+        return true;
+    }
+
+    // Tab = cycle focused channel + switch MIDI channel for QWERTY
+    if (keyCode == juce::KeyPress::tabKey)
+    {
+        int maxCh = channelStrips.isVrc6Visible() ? 7 : 4;
+        int fc = channelStrips.getFocusedChannel();
+        fc = (fc < maxCh) ? fc + 1 : 0;
+        channelStrips.setFocusedChannel (fc);
+
+        // Map channel index → MIDI channel (matches split-mode routing)
+        static constexpr int chToMidi[] = { 1, 2, 3, 10, 4, 5, 6, 7 };
+        keyboard.setMidiChannel (chToMidi[fc]);
+        return true;
+    }
+
+    // \ = toggle hold/latch mode (notes ring until toggled off)
+    if (keyCode == '\\')
+    {
+        bool current = processorRef.getHoldMode();
+        processorRef.setHoldMode (!current);
+        return true;
+    }
+
+    // - = velocity down
+    if (keyCode == '-')
+    {
+        currentVelocity = juce::jmax (0.1f, currentVelocity - 0.1f);
+        keyboard.setVelocity (currentVelocity, true);
+        return true;
+    }
+
+    // = = velocity up
+    if (keyCode == '=')
+    {
+        currentVelocity = juce::jmin (1.0f, currentVelocity + 0.1f);
+        keyboard.setVelocity (currentVelocity, true);
         return true;
     }
 

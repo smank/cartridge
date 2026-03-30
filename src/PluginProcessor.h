@@ -43,6 +43,9 @@ public:
     juce::MidiKeyboardState& getKeyboardState()   { return keyboardState; }
     cart::PresetManager& getPresetManager()         { return presetManager; }
 
+    void setHoldMode (bool on) { holdMode.store (on); }
+    bool getHoldMode() const   { return holdMode.load(); }
+
 private:
     void updateDspFromParameters();
 
@@ -57,6 +60,9 @@ private:
     cart::Arpeggiator      arpeggiator;
     cart::Lfo              lfo;
     int                    lastArpNote = -1;
+    int                    fadeInSamplesRemaining = 0;
+    std::atomic<bool>      holdMode { false };
+    bool                   wasHolding = false;
 
     // Cached parameter pointers for real-time access
     std::atomic<float>* masterVolumeParam  = nullptr;

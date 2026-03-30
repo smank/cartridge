@@ -130,9 +130,14 @@ void CartridgeProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     voiceManager.setSampleRateForPorta (sampleRate);
     lfo.setSampleRate (sampleRate);
     cachedParams = CachedParams{};   // Force full re-apply after APU reset
+    fadeInSamplesRemaining = 64;     // Suppress startup transient
 }
 
-void CartridgeProcessor::releaseResources() {}
+void CartridgeProcessor::releaseResources()
+{
+    effectsChain.reset();
+    apu.reset();
+}
 
 void CartridgeProcessor::updateDspFromParameters()
 {
@@ -326,6 +331,16 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // Inject MIDI events from on-screen keyboard
     keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
 
+    // Hold/latch mode: suppress note-offs, release all when toggled off
+    bool hold = holdMode.load();
+    if (wasHolding && !hold)
+    {
+        voiceManager.handleAllNotesOff();
+        arpeggiator.reset();
+        lastArpNote = -1;
+    }
+    wasHolding = hold;
+
     // Process MIDI and audio sample-by-sample
     auto midiIterator = midiMessages.cbegin();
     auto midiEnd      = midiMessages.cend();
@@ -340,6 +355,13 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 break;
 
             auto msg = metadata.getMessage();
+
+            // In hold mode, suppress note-off messages so notes ring
+            if (hold && msg.isNoteOff())
+            {
+                ++midiIterator;
+                continue;
+            }
 
             if (arpeggiator.isEnabled())
             {
@@ -404,6 +426,23 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // Block-based effects (handles mono→stereo internally)
     effectsChain.process (buffer);
+
+    // Fade-in ramp to suppress startup transient
+    if (fadeInSamplesRemaining > 0)
+    {
+        int numSamples = buffer.getNumSamples();
+        int samplesToRamp = juce::jmin (fadeInSamplesRemaining, numSamples);
+        int numChannels = buffer.getNumChannels();
+
+        for (int s = 0; s < samplesToRamp; ++s)
+        {
+            float gain = static_cast<float> (64 - fadeInSamplesRemaining + s) / 64.0f;
+            for (int ch = 0; ch < numChannels; ++ch)
+                buffer.setSample (ch, s, buffer.getSample (ch, s) * gain);
+        }
+
+        fadeInSamplesRemaining -= samplesToRamp;
+    }
 }
 
 juce::AudioProcessorEditor* CartridgeProcessor::createEditor()

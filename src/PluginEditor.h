@@ -29,6 +29,7 @@ private:
     juce::MidiKeyboardComponent keyboard;
 
     int currentOctaveOffset = 0;
+    float currentVelocity = 0.8f;
 
     static constexpr int topBarHeight = 40;
     static constexpr int keyboardHeight = 140;
