@@ -29,6 +29,12 @@ void MidiVoiceManager::processMidiMessage (const juce::MidiMessage& msg)
     {
         handlePitchBend (msg.getChannel(), msg.getPitchWheelValue());
     }
+    else if (msg.isController())
+    {
+        if (onControlChange)
+            onControlChange (msg.getControllerNumber(),
+                             msg.getControllerValue() / 127.0f);
+    }
     else if (msg.isAllNotesOff() || msg.isAllSoundOff())
     {
         handleAllNotesOff();

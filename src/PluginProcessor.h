@@ -43,6 +43,9 @@ public:
     juce::MidiKeyboardState& getKeyboardState()   { return keyboardState; }
     cart::PresetManager& getPresetManager()         { return presetManager; }
 
+    void setHoldMode (bool on) { holdMode.store (on); }
+    bool getHoldMode() const   { return holdMode.load(); }
+
 private:
     void updateDspFromParameters();
 
@@ -57,6 +60,14 @@ private:
     cart::Arpeggiator      arpeggiator;
     cart::Lfo              lfo;
     int                    lastArpNote = -1;
+    int                    fadeInSamplesRemaining = 0;
+    std::atomic<bool>      holdMode { false };
+    bool                   wasHolding = false;
+    std::atomic<bool>      pendingDspReset { false };  // Defers reset to audio thread
+
+    // DC blocking filter state (removes NES DAC offset)
+    float dcBlockX = 0.0f;   // previous input
+    float dcBlockY = 0.0f;   // previous output
 
     // Cached parameter pointers for real-time access
     std::atomic<float>* masterVolumeParam  = nullptr;

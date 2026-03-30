@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "dsp/DpcmSamples.h"
+#include <cmath>
 
 CartridgeProcessor::CartridgeProcessor()
     : AudioProcessor (BusesProperties()
@@ -82,6 +83,35 @@ CartridgeProcessor::CartridgeProcessor()
     lfoRateParam           = apvts.getRawParameterValue (cart::ParamIDs::LfoRate);
     lfoVibratoDepthParam   = apvts.getRawParameterValue (cart::ParamIDs::LfoVibratoDepth);
     lfoTremoloDepthParam   = apvts.getRawParameterValue (cart::ParamIDs::LfoTremoloDepth);
+
+    // MIDI CC → parameter mappings
+    voiceManager.onControlChange = [this] (int cc, float value01)
+    {
+        auto setNorm = [&] (const char* paramID, float v)
+        {
+            if (auto* p = apvts.getParameter (paramID))
+                p->setValueNotifyingHost (v);
+        };
+
+        auto setNormRange = [&] (const char* paramID, float v)
+        {
+            if (auto* p = apvts.getParameter (paramID))
+                p->setValueNotifyingHost (p->convertTo0to1 (v));
+        };
+
+        switch (cc)
+        {
+            case 1:  setNorm (cart::ParamIDs::LfoVibratoDepth, value01); break;
+            case 11: setNorm (cart::ParamIDs::MasterVolume, value01); break;
+            case 74: setNormRange (cart::ParamIDs::FltCutoff,
+                         20.0f * std::pow (1000.0f, value01)); break;
+            case 71: setNormRange (cart::ParamIDs::FltResonance,
+                         0.1f + value01 * 4.9f); break;
+            case 91: setNorm (cart::ParamIDs::RvMix, value01); break;
+            case 93: setNorm (cart::ParamIDs::ChMix, value01); break;
+            default: break;
+        }
+    };
 }
 
 CartridgeProcessor::~CartridgeProcessor() = default;
@@ -97,13 +127,7 @@ void CartridgeProcessor::setCurrentProgram (int index)
 {
     currentPreset = index;
     presetManager.applyPreset (index, apvts);
-    effectsChain.reset();
-    apu.reset();
-    voiceManager.handleAllNotesOff();
-    arpeggiator.reset();
-    lastArpNote = -1;
-    lfo.reset();
-    cachedParams = CachedParams{};   // Force full re-apply of all DSP params
+    pendingDspReset.store (true);    // Actual reset deferred to audio thread
 }
 const juce::String CartridgeProcessor::getProgramName (int index) { return presetManager.getPresetName (index); }
 void CartridgeProcessor::changeProgramName (int, const juce::String&) {}
@@ -129,10 +153,17 @@ void CartridgeProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     arpeggiator.setSampleRate (sampleRate);
     voiceManager.setSampleRateForPorta (sampleRate);
     lfo.setSampleRate (sampleRate);
+    // DC blocker state intentionally preserved — resetting to 0 causes a settling
+    // transient.  Member initializers handle the very first startup.
     cachedParams = CachedParams{};   // Force full re-apply after APU reset
+    fadeInSamplesRemaining = 1024;   // Suppress startup transient (covers DC blocker settling)
 }
 
-void CartridgeProcessor::releaseResources() {}
+void CartridgeProcessor::releaseResources()
+{
+    effectsChain.reset();
+    apu.reset();
+}
 
 void CartridgeProcessor::updateDspFromParameters()
 {
@@ -319,12 +350,35 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
 
+    // Handle deferred DSP reset (from preset switch / state restore on UI thread)
+    if (pendingDspReset.exchange (false))
+    {
+        effectsChain.reset();
+        apu.reset();
+        voiceManager.handleAllNotesOff();
+        arpeggiator.reset();
+        lastArpNote = -1;
+        lfo.reset();
+        cachedParams = CachedParams{};
+        fadeInSamplesRemaining = 1024;   // ~23 ms — covers DC blocker settling
+    }
+
     // Update DSP parameters from APVTS
     updateDspFromParameters();
     effectsChain.updateFromParams (apvts);
 
     // Inject MIDI events from on-screen keyboard
     keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
+
+    // Hold/latch mode: suppress note-offs, release all when toggled off
+    bool hold = holdMode.load();
+    if (wasHolding && !hold)
+    {
+        voiceManager.handleAllNotesOff();
+        arpeggiator.reset();
+        lastArpNote = -1;
+    }
+    wasHolding = hold;
 
     // Process MIDI and audio sample-by-sample
     auto midiIterator = midiMessages.cbegin();
@@ -340,6 +394,13 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 break;
 
             auto msg = metadata.getMessage();
+
+            // In hold mode, suppress note-off messages so notes ring
+            if (hold && msg.isNoteOff())
+            {
+                ++midiIterator;
+                continue;
+            }
 
             if (arpeggiator.isEnabled())
             {
@@ -399,11 +460,46 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
         // Generate one sample from the APU — write to ch0 only
         float out = apu.process() * lfo.getVolumeMultiplier();
-        buffer.setSample (0, sample, out);
+
+        // DC blocking filter: removes NES DAC offset (~0.5–0.9 at silence)
+        // y[n] = x[n] - x[n-1] + R * y[n-1], R=0.995 ≈ 16 Hz cutoff at 44.1kHz
+        float dcOut = out - dcBlockX + 0.995f * dcBlockY;
+        dcBlockX = out;
+        dcBlockY = dcOut;
+
+        buffer.setSample (0, sample, dcOut);
+    }
+
+    // Fade-in ramp BEFORE effects — prevents transients from being stored in
+    // reverb/delay buffers where they'd leak out after the ramp completes.
+    // 1024 total: first 512 hard-muted (covers DC blocker settling), last 512 ramped.
+    if (fadeInSamplesRemaining > 0)
+    {
+        int numSamples = buffer.getNumSamples();
+        static constexpr int rampLength = 512;
+
+        float* data = buffer.getWritePointer (0);
+        for (int s = 0; s < numSamples && fadeInSamplesRemaining > 0; ++s)
+        {
+            float gain = 0.0f;
+            if (fadeInSamplesRemaining <= rampLength)
+                gain = static_cast<float> (rampLength - fadeInSamplesRemaining) / static_cast<float> (rampLength);
+
+            data[s] *= gain;
+            --fadeInSamplesRemaining;
+        }
     }
 
     // Block-based effects (handles mono→stereo internally)
     effectsChain.process (buffer);
+
+    // Soft limiter — prevents clipping from stacked effects
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    {
+        float* samples = buffer.getWritePointer (ch);
+        for (int s = 0; s < buffer.getNumSamples(); ++s)
+            samples[s] = std::tanh (samples[s]);
+    }
 }
 
 juce::AudioProcessorEditor* CartridgeProcessor::createEditor()
@@ -422,15 +518,11 @@ void CartridgeProcessor::getStateInformation (juce::MemoryBlock& destData)
 
 void CartridgeProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // Skip state restore in standalone mode so we always start with defaults
-    if (wrapperType == wrapperType_Standalone)
-        return;
-
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
     if (xmlState != nullptr && xmlState->hasTagName (apvts.state.getType()))
     {
         apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
-        cachedParams = CachedParams{};   // Force full re-apply with restored state
+        pendingDspReset.store (true);        // Actual reset deferred to audio thread
     }
 }
 

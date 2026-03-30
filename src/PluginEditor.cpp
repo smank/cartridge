@@ -46,11 +46,14 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     keyboard.setKeyWidth (24.0f);
     keyboard.setMidiChannel (1);
     keyboard.setAvailableRange (36, 96); // C2 to C7 (~5 octaves)
+    keyboard.setKeyPressBaseOctave (5);  // QWERTY keys start at C4 (middle C)
+    keyboard.setVelocity (0.8f, true);   // QWERTY velocity; mouse uses click position
 
     addAndMakeVisible (topBar);
     addAndMakeVisible (channelStrips);
     addAndMakeVisible (effectsBar);
     addAndMakeVisible (modulationBar);
+    addAndMakeVisible (statusBar);
     addAndMakeVisible (keyboard);
 
     // Sync initial VRC6 state
@@ -63,8 +66,26 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     setResizeLimits (700, 560, 1600, 1100);
     setWantsKeyboardFocus (true);
 
-    // Give keyboard focus so QWERTY-to-MIDI works immediately
-    keyboard.grabKeyboardFocus();
+    // Editor keeps focus so shortcut keys ([, ], -, =, Tab, etc.) are handled
+    // first; unhandled QWERTY keys are forwarded to the keyboard at the end of
+    // keyPressed() for MIDI note input.
+    grabKeyboardFocus();
+
+    // Deferred: switch standalone window to native macOS title bar (traffic lights
+    // + double-click fullscreen).  Must run after the window is fully constructed.
+    juce::Timer::callAfterDelay (200, [safeThis = juce::Component::SafePointer<CartridgeEditor> (this)]
+    {
+        if (safeThis == nullptr)
+            return;
+
+        if (auto* docWindow = dynamic_cast<juce::DocumentWindow*> (safeThis->getTopLevelComponent()))
+        {
+            docWindow->setUsingNativeTitleBar (true);
+
+            if (auto* peer = docWindow->getPeer())
+                cart::enableTitleBarFullscreen (peer->getNativeHandle());
+        }
+    });
 }
 
 CartridgeEditor::~CartridgeEditor() = default;
@@ -79,7 +100,17 @@ void CartridgeEditor::resized()
     auto area = getLocalBounds();
 
     topBar.setBounds (area.removeFromTop (topBarHeight));
-    keyboard.setBounds (area.removeFromBottom (keyboardHeight));
+
+    // Scale keyboard height proportionally (20% of window, clamped)
+    int kbHeight = juce::jlimit (100, 220, getHeight() / 5);
+    keyboard.setBounds (area.removeFromBottom (kbHeight));
+
+    // Scale key width to fill the keyboard width (C2–C7 = 36 white keys)
+    static constexpr int numWhiteKeys = 36;
+    float kw = static_cast<float> (keyboard.getWidth()) / static_cast<float> (numWhiteKeys);
+    keyboard.setKeyWidth (juce::jmax (kw, 14.0f));
+
+    statusBar.setBounds (area.removeFromBottom (statusBarHeight));
     effectsBar.setBounds (area.removeFromBottom (effectsBar.getDesiredHeight()));
     modulationBar.setBounds (area.removeFromBottom (modulationBar.getDesiredHeight()));
     channelStrips.setBounds (area);
@@ -156,6 +187,17 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
+    // Ctrl+Cmd+F = Toggle fullscreen (standard macOS shortcut)
+    if ((keyCode == 'F' || keyCode == 'f')
+        && key.getModifiers().isCommandDown()
+        && key.getModifiers().isCtrlDown())
+    {
+        if (auto* tlc = getTopLevelComponent())
+            if (auto* peer = tlc->getPeer())
+                peer->setFullScreen (! peer->isFullScreen());
+        return true;
+    }
+
     // Space = All notes off (panic)
     if (keyCode == juce::KeyPress::spaceKey)
     {
@@ -163,8 +205,8 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
-    // Ctrl+Z = Octave down (plain Z is a piano key)
-    if ((keyCode == 'Z' || keyCode == 'z') && key.getModifiers().isCommandDown())
+    // [ = Octave down
+    if (keyCode == '[')
     {
         if (currentOctaveOffset > -3)
         {
@@ -172,12 +214,14 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
             int low  = 36 + currentOctaveOffset * 12;
             int high = 96 + currentOctaveOffset * 12;
             keyboard.setAvailableRange (juce::jmax (0, low), juce::jmin (127, high));
+            keyboard.setKeyPressBaseOctave (5 + currentOctaveOffset);
         }
+        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
         return true;
     }
 
-    // Ctrl+X = Octave up (plain X is a piano key)
-    if ((keyCode == 'X' || keyCode == 'x') && key.getModifiers().isCommandDown())
+    // ] = Octave up
+    if (keyCode == ']')
     {
         if (currentOctaveOffset < 2)
         {
@@ -185,7 +229,56 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
             int low  = 36 + currentOctaveOffset * 12;
             int high = 96 + currentOctaveOffset * 12;
             keyboard.setAvailableRange (juce::jmax (0, low), juce::jmin (127, high));
+            keyboard.setKeyPressBaseOctave (5 + currentOctaveOffset);
         }
+        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
+        return true;
+    }
+
+    // Tab / Shift+Tab = cycle focused channel + switch MIDI channel for QWERTY
+    if (keyCode == juce::KeyPress::tabKey)
+    {
+        int maxCh = channelStrips.isVrc6Visible() ? 7 : 4;
+        int fc = channelStrips.getFocusedChannel();
+
+        if (key.getModifiers().isShiftDown())
+            fc = (fc > 0) ? fc - 1 : maxCh;
+        else
+            fc = (fc < maxCh) ? fc + 1 : 0;
+
+        channelStrips.setFocusedChannel (fc);
+
+        // Map channel index → MIDI channel (matches split-mode routing)
+        static constexpr int chToMidi[] = { 1, 2, 3, 10, 4, 5, 6, 7 };
+        keyboard.setMidiChannel (chToMidi[fc]);
+        statusBar.update (fc, currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
+        return true;
+    }
+
+    // \ = toggle hold/latch mode (notes ring until toggled off)
+    if (keyCode == '\\')
+    {
+        bool current = processorRef.getHoldMode();
+        processorRef.setHoldMode (!current);
+        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, !current);
+        return true;
+    }
+
+    // - = velocity down
+    if (keyCode == '-')
+    {
+        currentVelocity = juce::jmax (0.1f, currentVelocity - 0.1f);
+        keyboard.setVelocity (currentVelocity, true);
+        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
+        return true;
+    }
+
+    // = = velocity up
+    if (keyCode == '=')
+    {
+        currentVelocity = juce::jmin (1.0f, currentVelocity + 0.1f);
+        keyboard.setVelocity (currentVelocity, true);
+        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
         return true;
     }
 
@@ -231,6 +324,23 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
                     param->setValueNotifyingHost (current < 0.5f ? 1.0f : 0.0f);
                 }
             }
+        }
+        return true;
+    }
+
+    // Escape = unsolo (restore all channel mixes to full)
+    if (keyCode == juce::KeyPress::escapeKey)
+    {
+        const char* mixParams[] = {
+            cart::ParamIDs::P1Mix, cart::ParamIDs::P2Mix,
+            cart::ParamIDs::TriMix, cart::ParamIDs::NoiseMix,
+            cart::ParamIDs::DpcmMix, cart::ParamIDs::Vrc6P1Mix,
+            cart::ParamIDs::Vrc6P2Mix, cart::ParamIDs::Vrc6SawMix
+        };
+        for (auto* id : mixParams)
+        {
+            if (auto* param = apvts.getParameter (id))
+                param->setValueNotifyingHost (1.0f);
         }
         return true;
     }

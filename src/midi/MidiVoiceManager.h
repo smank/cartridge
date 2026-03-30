@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "../dsp/Apu.h"
 #include "../dsp/Portamento.h"
+#include <functional>
 
 namespace cart {
 
@@ -53,6 +54,9 @@ public:
 
     /// Clear all active notes (call on preset change)
     void handleAllNotesOff();
+
+    /// Callback for MIDI CC messages (ccNumber, value01)
+    std::function<void(int, float)> onControlChange;
 
 private:
     // Portamento for each melodic channel
