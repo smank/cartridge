@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Cartridge VERSION 0.1.0 LANGUAGES C CXX)
+project(Cartridge VERSION 0.1.0 LANGUAGES C CXX OBJC OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -64,8 +64,10 @@ target_sources(Cartridge
         src/dsp/effects/EffectsChain.cpp
         src/ui/EffectsBarComponent.cpp
         src/ui/ModulationBarComponent.cpp
+        src/ui/StatusBarComponent.cpp
         src/midi/MidiVoiceManager.cpp
         src/midi/Arpeggiator.cpp
+        src/ui/FullscreenHelper.mm
 )
 
 # ─── Include Paths ───────────────────────────────────────────────────────────
