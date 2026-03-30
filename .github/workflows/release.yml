@@ -136,7 +136,7 @@ jobs:
           cd Cartridge && zip -r ../Cartridge-Linux.zip .
 
       - name: Upload release archive
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Cartridge-${{ matrix.name }}
           path: Cartridge-${{ matrix.name }}.zip
@@ -146,10 +146,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
 

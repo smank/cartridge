@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Cartridge VERSION 0.1.0 LANGUAGES C CXX OBJC OBJCXX)
+if(APPLE)
+    project(Cartridge VERSION 1.2.0 LANGUAGES C CXX OBJC OBJCXX)
+else()
+    project(Cartridge VERSION 1.2.0 LANGUAGES C CXX)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -67,8 +71,12 @@ target_sources(Cartridge
         src/ui/StatusBarComponent.cpp
         src/midi/MidiVoiceManager.cpp
         src/midi/Arpeggiator.cpp
-        src/ui/FullscreenHelper.mm
+        src/ui/FullscreenHelper.cpp
 )
+
+if(APPLE)
+    target_sources(Cartridge PRIVATE src/ui/FullscreenHelper.mm)
+endif()
 
 # ─── Include Paths ───────────────────────────────────────────────────────────
 target_include_directories(Cartridge
