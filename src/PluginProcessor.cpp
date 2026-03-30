@@ -405,22 +405,25 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
             auto msg = metadata.getMessage();
 
-            if (msg.isController() && msg.getControllerNumber() == 64)
+            if (msg.isController())
             {
-                sustainPedal.store (msg.getControllerValue() >= 64);
-                ++midiIterator;
-                continue;
+                int cc = msg.getControllerNumber();
+                if (cc == 64)
+                {
+                    sustainPedal.store (msg.getControllerValue() >= 64);
+                    ++midiIterator;
+                    continue;
+                }
+                // Reset All Controllers — clear sustain to prevent stuck pedal
+                if (cc == 121)
+                    sustainPedal.store (false);
             }
 
-            // In hold/sustain mode, suppress note-off messages so notes ring
-            if ((hold || sustainPedal.load()) && msg.isNoteOff())
-            {
-                ++midiIterator;
-                continue;
-            }
+            bool suppressNoteOff = (hold || sustainPedal.load()) && msg.isNoteOff();
 
             if (arpeggiator.isEnabled())
             {
+                // Arp must always track physical key state for correct note-off
                 if (msg.isNoteOn())
                     arpeggiator.noteOn (msg.getNoteNumber(), msg.getVelocity());
                 else if (msg.isNoteOff())
@@ -428,7 +431,7 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 else
                     voiceManager.processMidiMessage (msg); // pitch bend etc pass through
             }
-            else
+            else if (! suppressNoteOff)
             {
                 voiceManager.processMidiMessage (msg);
             }
