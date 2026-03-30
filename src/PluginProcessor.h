@@ -63,6 +63,11 @@ private:
     int                    fadeInSamplesRemaining = 0;
     std::atomic<bool>      holdMode { false };
     bool                   wasHolding = false;
+    std::atomic<bool>      pendingDspReset { false };  // Defers reset to audio thread
+
+    // DC blocking filter state (removes NES DAC offset)
+    float dcBlockX = 0.0f;   // previous input
+    float dcBlockY = 0.0f;   // previous output
 
     // Cached parameter pointers for real-time access
     std::atomic<float>* masterVolumeParam  = nullptr;
