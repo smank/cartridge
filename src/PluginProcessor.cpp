@@ -359,6 +359,7 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         arpeggiator.reset();
         lastArpNote = -1;
         lfo.reset();
+        sustainPedal.store (false);
         cachedParams = CachedParams{};
         fadeInSamplesRemaining = 1024;   // ~23 ms — covers DC blocker settling
     }
@@ -380,6 +381,15 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     wasHolding = hold;
 
+    bool sustain = sustainPedal.load();
+    if (wasSustaining && !sustain && !hold)
+    {
+        voiceManager.handleAllNotesOff();
+        arpeggiator.reset();
+        lastArpNote = -1;
+    }
+    wasSustaining = sustain;
+
     // Process MIDI and audio sample-by-sample
     auto midiIterator = midiMessages.cbegin();
     auto midiEnd      = midiMessages.cend();
@@ -395,8 +405,15 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
             auto msg = metadata.getMessage();
 
-            // In hold mode, suppress note-off messages so notes ring
-            if (hold && msg.isNoteOff())
+            if (msg.isController() && msg.getControllerNumber() == 64)
+            {
+                sustainPedal.store (msg.getControllerValue() >= 64);
+                ++midiIterator;
+                continue;
+            }
+
+            // In hold/sustain mode, suppress note-off messages so notes ring
+            if ((hold || sustainPedal.load()) && msg.isNoteOff())
             {
                 ++midiIterator;
                 continue;

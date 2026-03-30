@@ -70,12 +70,19 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     };
     addAndMakeVisible (saveButton);
 
+    // Panic button
+    panicButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
+    panicButton.setColour (juce::TextButton::textColourOffId, Colors::fxBright);
+    panicButton.onClick = [this] { processorRef.getKeyboardState().allNotesOff (0); };
+    addAndMakeVisible (panicButton);
+
     // ─── Master Volume ───────────────────────────────────────────────────
     masterVolSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     masterVolSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     masterVolSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
     masterVolSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (masterVolSlider);
+    masterVolSlider.setPopupDisplayEnabled (true, false, this);
     masterVolAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::MasterVolume, masterVolSlider);
 
@@ -90,6 +97,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     masterTuneSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
     masterTuneSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (masterTuneSlider);
+    masterTuneSlider.setPopupDisplayEnabled (true, false, this);
     masterTuneAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::MasterTune, masterTuneSlider);
 
@@ -125,6 +133,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     velocitySensSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
     velocitySensSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (velocitySensSlider);
+    velocitySensSlider.setPopupDisplayEnabled (true, false, this);
     velocitySensAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::VelocitySens, velocitySensSlider);
 
@@ -139,6 +148,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     pitchBendSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
     pitchBendSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (pitchBendSlider);
+    pitchBendSlider.setPopupDisplayEnabled (true, false, this);
     pitchBendAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::PitchBendRange, pitchBendSlider);
 
@@ -159,6 +169,47 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     addAndMakeVisible (vrc6Toggle);
     vrc6Attach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::Vrc6Enabled, vrc6Toggle);
+
+    // ─── Scale ComboBox ────────────────────────────────────────────────
+    scaleCombo.addItem ("75%", 1);
+    scaleCombo.addItem ("100%", 2);
+    scaleCombo.addItem ("125%", 3);
+    scaleCombo.addItem ("150%", 4);
+    scaleCombo.setSelectedId (2, juce::dontSendNotification);
+    scaleCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
+    scaleCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
+    scaleCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    scaleCombo.onChange = [this]
+    {
+        static constexpr float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
+        int idx = scaleCombo.getSelectedId() - 1;
+        if (idx >= 0 && idx < 4 && onScaleChanged)
+            onScaleChanged (scales[idx]);
+    };
+    addAndMakeVisible (scaleCombo);
+
+    // ─── MIDI Info Button ────────────────────────────────────────────────
+    midiInfoButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
+    midiInfoButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    midiInfoButton.onClick = [this]
+    {
+        auto* popup = new juce::AlertWindow ("MIDI CC Mappings", "", juce::MessageBoxIconType::NoIcon);
+        popup->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
+        popup->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
+        popup->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
+        popup->addTextBlock (
+            "CC 1   Vibrato Depth\n"
+            "CC 11  Master Volume\n"
+            "CC 64  Sustain Pedal\n"
+            "CC 71  Filter Resonance\n"
+            "CC 74  Filter Cutoff\n"
+            "CC 91  Reverb Mix\n"
+            "CC 93  Chorus Mix");
+        popup->addButton ("OK", 0);
+        popup->enterModalState (true, juce::ModalCallbackFunction::create (
+            [popup] (int) { delete popup; }), false);
+    };
+    addAndMakeVisible (midiInfoButton);
 
     // Poll for DAW-initiated preset changes
     startTimerHz (4);
@@ -236,52 +287,56 @@ void TopBarComponent::paint (juce::Graphics& g)
 
 void TopBarComponent::resized()
 {
-    auto area = getLocalBounds().reduced (6, 4);
+    auto bounds = getLocalBounds().reduced (6, 2);
+    int rowH = bounds.getHeight() / 2;
 
-    // Preset section
-    prevButton.setBounds (area.removeFromLeft (26));
-    area.removeFromLeft (2);
-    nextButton.setBounds (area.removeFromLeft (26));
-    area.removeFromLeft (2);
-    saveButton.setBounds (area.removeFromLeft (40));
-    area.removeFromLeft (4);
+    // ─── Row 1: Preset navigation, combos, VRC6 toggle ──────────────────
+    auto row1 = bounds.removeFromTop (rowH).reduced (0, 2);
 
-    int presetW = juce::jmin (200, area.getWidth() / 3);
-    presetCombo.setBounds (area.removeFromLeft (presetW));
-    area.removeFromLeft (8);
+    prevButton.setBounds (row1.removeFromLeft (26));
+    row1.removeFromLeft (2);
+    nextButton.setBounds (row1.removeFromLeft (26));
+    row1.removeFromLeft (2);
+    saveButton.setBounds (row1.removeFromLeft (40));
+    row1.removeFromLeft (6);
 
-    // Right side: VRC6 toggle
-    vrc6Toggle.setBounds (area.removeFromRight (60));
-    area.removeFromRight (4);
+    int presetW = juce::jmin (220, row1.getWidth() / 3);
+    presetCombo.setBounds (row1.removeFromLeft (presetW));
+    row1.removeFromLeft (6);
+    panicButton.setBounds (row1.removeFromLeft (46));
 
-    // MIDI mode
-    midiModeCombo.setBounds (area.removeFromRight (65));
-    area.removeFromRight (4);
+    // Right side
+    vrc6Toggle.setBounds (row1.removeFromRight (60));
+    row1.removeFromRight (4);
+    scaleCombo.setBounds (row1.removeFromRight (65));
+    row1.removeFromRight (4);
+    midiInfoButton.setBounds (row1.removeFromRight (42));
+    row1.removeFromRight (4);
+    midiModeCombo.setBounds (row1.removeFromRight (70));
+    row1.removeFromRight (6);
+    regionCombo.setBounds (row1.removeFromRight (65));
 
-    // Region
-    regionCombo.setBounds (area.removeFromRight (60));
-    area.removeFromRight (8);
+    // ─── Row 2: Sliders ─────────────────────────────────────────────────
+    auto row2 = bounds.reduced (0, 2);
 
-    // Remaining space: Vol, Tune, Vel, PB sliders
-    int remaining = area.getWidth();
-    int labelSpace = 24 + 30 + 24 + 24; // Vol + Tune + Vel + PB labels
-    int gaps = 8 * 3;                     // 3 inter-slider gaps
-    int sliderW = (remaining - labelSpace - gaps) / 4;
+    int labelSpace = 28 + 34 + 26 + 24;
+    int gaps = 8 * 3;
+    int sliderW = (row2.getWidth() - labelSpace - gaps) / 4;
 
-    masterVolLabel.setBounds (area.removeFromLeft (24));
-    masterVolSlider.setBounds (area.removeFromLeft (juce::jmax (sliderW, 30)));
-    area.removeFromLeft (8);
+    masterVolLabel.setBounds (row2.removeFromLeft (28));
+    masterVolSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
+    row2.removeFromLeft (8);
 
-    masterTuneLabel.setBounds (area.removeFromLeft (30));
-    masterTuneSlider.setBounds (area.removeFromLeft (juce::jmax (sliderW, 30)));
-    area.removeFromLeft (8);
+    masterTuneLabel.setBounds (row2.removeFromLeft (34));
+    masterTuneSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
+    row2.removeFromLeft (8);
 
-    velocitySensLabel.setBounds (area.removeFromLeft (24));
-    velocitySensSlider.setBounds (area.removeFromLeft (juce::jmax (sliderW, 30)));
-    area.removeFromLeft (8);
+    velocitySensLabel.setBounds (row2.removeFromLeft (26));
+    velocitySensSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
+    row2.removeFromLeft (8);
 
-    pitchBendLabel.setBounds (area.removeFromLeft (24));
-    pitchBendSlider.setBounds (area.removeFromLeft (juce::jmax (sliderW, 30)));
+    pitchBendLabel.setBounds (row2.removeFromLeft (24));
+    pitchBendSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
 }
 
 } // namespace cart

@@ -3,18 +3,26 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Colors.h"
 
+class CartridgeProcessor;
+
 namespace cart {
 
 class StatusBarComponent : public juce::Component
 {
 public:
-    StatusBarComponent();
+    StatusBarComponent (CartridgeProcessor& processor);
 
     void paint (juce::Graphics&) override;
+    void resized() override;
 
     void update (int channelIndex, float velocity, int octaveOffset, bool holdMode);
 
 private:
+    CartridgeProcessor& processorRef;
+    juce::ToggleButton holdToggle;
+    juce::Label versionLabel;
+    bool currentSustain = false;
+
     int    currentChannel     = 0;
     float  currentVelocity    = 0.8f;
     int    currentOctOffset   = 0;

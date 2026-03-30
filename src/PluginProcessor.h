@@ -45,6 +45,7 @@ public:
 
     void setHoldMode (bool on) { holdMode.store (on); }
     bool getHoldMode() const   { return holdMode.load(); }
+    bool getSustainPedal() const { return sustainPedal.load(); }
 
 private:
     void updateDspFromParameters();
@@ -63,6 +64,8 @@ private:
     int                    fadeInSamplesRemaining = 0;
     std::atomic<bool>      holdMode { false };
     bool                   wasHolding = false;
+    std::atomic<bool>      sustainPedal { false };
+    bool                   wasSustaining = false;
     std::atomic<bool>      pendingDspReset { false };  // Defers reset to audio thread
 
     // DC blocking filter state (removes NES DAC offset)
