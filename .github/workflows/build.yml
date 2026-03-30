@@ -47,26 +47,26 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Upload VST3
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Cartridge-VST3-${{ matrix.name }}
           path: build/Cartridge_artefacts/Release/VST3/
 
       - name: Upload CLAP
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Cartridge-CLAP-${{ matrix.name }}
           path: build/Cartridge_artefacts/Release/CLAP/
 
       - name: Upload AU (macOS only)
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Cartridge-AU-macOS
           path: build/Cartridge_artefacts/Release/AU/
 
       - name: Upload Standalone
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Cartridge-Standalone-${{ matrix.name }}
           path: build/Cartridge_artefacts/Release/Standalone/
