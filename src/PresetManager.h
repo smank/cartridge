@@ -27,6 +27,7 @@ public:
     void deleteUserPreset (int index);
     void refreshUserPresets();
     bool isFactoryPreset (int index) const { return index < static_cast<int> (factoryCount); }
+    int getFactoryPresetCount() const { return static_cast<int> (factoryCount); }
 
 private:
     void buildPresets();

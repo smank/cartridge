@@ -176,6 +176,7 @@ void TopBarComponent::populatePresets()
     for (int i = 0; i < numPresets; ++i)
         presetCombo.addItem (processorRef.getProgramName (i), i + 1);
 
+    presetCombo.setFactoryPresetCount (processorRef.getPresetManager().getFactoryPresetCount());
     presetCombo.setSelectedId (processorRef.getCurrentProgram() + 1, juce::dontSendNotification);
 }
 
@@ -214,6 +215,13 @@ void TopBarComponent::timerCallback()
         if (onVrc6Toggle)
             onVrc6Toggle (vrc6On);
     }
+}
+
+void TopBarComponent::mouseDoubleClick (const juce::MouseEvent&)
+{
+    if (auto* tlc = getTopLevelComponent())
+        if (auto* peer = tlc->getPeer())
+            peer->setFullScreen (! peer->isFullScreen());
 }
 
 void TopBarComponent::paint (juce::Graphics& g)

@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Colors.h"
+#include "PresetComboBox.h"
 
 // Forward declare
 class CartridgeProcessor;
@@ -20,6 +21,7 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     void timerCallback() override;
+    void mouseDoubleClick (const juce::MouseEvent&) override;
 
     std::function<void (bool)> onVrc6Toggle;
     std::function<void()> onPresetChanged;
@@ -30,7 +32,7 @@ private:
     CartridgeProcessor& processorRef;
 
     // Preset controls
-    juce::ComboBox presetCombo;
+    PresetComboBox presetCombo;
     juce::TextButton prevButton { "<" };
     juce::TextButton nextButton { ">" };
     juce::TextButton saveButton { "Save" };
