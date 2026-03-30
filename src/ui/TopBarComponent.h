@@ -25,8 +25,10 @@ public:
 
     std::function<void (bool)> onVrc6Toggle;
     std::function<void()> onPresetChanged;
+    std::function<void (float)> onScaleChanged;
 
     void navigatePreset (int delta);
+    void setScaleIndex (int comboId) { scaleCombo.setSelectedId (comboId, juce::dontSendNotification); }
 
 private:
     CartridgeProcessor& processorRef;
@@ -36,6 +38,7 @@ private:
     juce::TextButton prevButton { "<" };
     juce::TextButton nextButton { ">" };
     juce::TextButton saveButton { "Save" };
+    juce::TextButton panicButton { "Panic" };
 
     // Global controls
     juce::Slider masterVolSlider;
@@ -63,6 +66,9 @@ private:
     // VRC6 toggle
     juce::ToggleButton vrc6Toggle;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> vrc6Attach;
+
+    juce::ComboBox scaleCombo;
+    juce::TextButton midiInfoButton { "MIDI" };
 
     void populatePresets();
     void selectPreset (int index);
