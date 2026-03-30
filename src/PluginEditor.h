@@ -33,11 +33,17 @@ private:
 
     int currentOctaveOffset = 0;
     float currentVelocity = 0.8f;
+    float currentScale = 1.0f;
 
-    static constexpr int topBarHeight = 40;
+    void applyScale (float scale);
+    void loadScalePreference();
+    void saveScalePreference();
+    juce::File getSettingsFile() const;
+
+    static constexpr int topBarHeight = 68;
     static constexpr int statusBarHeight = 28;
-    static constexpr int defaultWidth = 900;
-    static constexpr int defaultHeight = 700;
+    static constexpr int baseWidth = 900;
+    static constexpr int baseHeight = 700;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CartridgeEditor)
 };

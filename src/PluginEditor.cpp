@@ -7,6 +7,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
       channelStrips (p.getApvts()),
       effectsBar (p.getApvts()),
       modulationBar (p.getApvts()),
+      statusBar (p),
       keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     // Wire up VRC6 toggle from top bar to channel strip area
@@ -21,6 +22,9 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
         effectsBar.collapseAll();
         modulationBar.collapseAll();
     };
+
+    // Wire up UI scaling from top bar
+    topBar.onScaleChanged = [this] (float s) { applyScale (s); };
 
     // Wire up FX panel height changes
     effectsBar.onHeightChanged = [this] { resized(); };
@@ -61,9 +65,15 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     if (vrc6Param != nullptr)
         channelStrips.setVrc6Visible (vrc6Param->load() >= 0.5f);
 
-    setSize (defaultWidth, defaultHeight);
+    // Load saved scale (just the value, don't resize yet)
+    loadScalePreference();
+
+    int initW = juce::roundToInt (baseWidth * currentScale);
+    int initH = juce::roundToInt (baseHeight * currentScale);
+
+    setSize (initW, initH);
     setResizable (true, true);
-    setResizeLimits (700, 560, 1600, 1100);
+    setResizeLimits (juce::jmin (initW, 700), juce::jmin (initH, 560), 3840, 2160);
     setWantsKeyboardFocus (true);
 
     // Editor keeps focus so shortcut keys ([, ], -, =, Tab, etc.) are handled
@@ -73,6 +83,8 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
     // Deferred: switch standalone window to native macOS title bar (traffic lights
     // + double-click fullscreen).  Must run after the window is fully constructed.
+    // Re-apply size after the title bar switch to prevent the peer reset from
+    // snapping back to a stale size.
     juce::Timer::callAfterDelay (200, [safeThis = juce::Component::SafePointer<CartridgeEditor> (this)]
     {
         if (safeThis == nullptr)
@@ -80,15 +92,70 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
         if (auto* docWindow = dynamic_cast<juce::DocumentWindow*> (safeThis->getTopLevelComponent()))
         {
+            docWindow->setColour (juce::ResizableWindow::backgroundColourId,
+                                  cart::Colors::bgDark);
             docWindow->setUsingNativeTitleBar (true);
 
             if (auto* peer = docWindow->getPeer())
                 cart::enableTitleBarFullscreen (peer->getNativeHandle());
         }
+
+        // Re-apply scaled size after native title bar recreates the window peer
+        safeThis->setSize (juce::roundToInt (baseWidth * safeThis->currentScale),
+                           juce::roundToInt (baseHeight * safeThis->currentScale));
     });
 }
 
 CartridgeEditor::~CartridgeEditor() = default;
+
+juce::File CartridgeEditor::getSettingsFile() const
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+               .getChildFile ("Cartridge")
+               .getChildFile ("ui-settings.xml");
+}
+
+void CartridgeEditor::applyScale (float scale)
+{
+    currentScale = scale;
+    int w = juce::roundToInt (baseWidth * scale);
+    int h = juce::roundToInt (baseHeight * scale);
+    setResizeLimits (juce::jmin (w, 700), juce::jmin (h, 560), 3840, 2160);
+    setSize (w, h);
+    saveScalePreference();
+}
+
+void CartridgeEditor::loadScalePreference()
+{
+    auto file = getSettingsFile();
+    if (! file.existsAsFile())
+        return;
+
+    if (auto xml = juce::parseXML (file))
+    {
+        float scale = static_cast<float> (xml->getDoubleAttribute ("uiScale", 1.0));
+
+        // Map scale to combo ID: 0.75→1, 1.0→2, 1.25→3, 1.5→4
+        int comboId = 2;
+        if      (scale <= 0.76f) comboId = 1;
+        else if (scale <= 1.01f) comboId = 2;
+        else if (scale <= 1.26f) comboId = 3;
+        else                     comboId = 4;
+
+        topBar.setScaleIndex (comboId);
+        currentScale = scale;
+    }
+}
+
+void CartridgeEditor::saveScalePreference()
+{
+    auto file = getSettingsFile();
+    file.getParentDirectory().createDirectory();
+
+    juce::XmlElement xml ("CartridgeSettings");
+    xml.setAttribute ("uiScale", static_cast<double> (currentScale));
+    xml.writeTo (file);
+}
 
 void CartridgeEditor::paint (juce::Graphics& g)
 {
@@ -97,7 +164,11 @@ void CartridgeEditor::paint (juce::Graphics& g)
 
 void CartridgeEditor::resized()
 {
+    // Center all content within a max-width column; bgDark fills the margins
+    static constexpr int maxContentWidth = 1600;
     auto area = getLocalBounds();
+    if (area.getWidth() > maxContentWidth)
+        area = area.withSizeKeepingCentre (maxContentWidth, area.getHeight());
 
     topBar.setBounds (area.removeFromTop (topBarHeight));
 
