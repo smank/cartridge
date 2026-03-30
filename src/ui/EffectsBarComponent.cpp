@@ -51,6 +51,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
         apvts, ParamIDs::FltEnabled, fltEnable);
     fltEnable.setSize (0, 0);
 
+    fltType.addItemList ({ "LP", "BP", "HP" }, 1);
     fltType.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     fltType.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     fltType.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -358,8 +359,7 @@ void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIn
 {
     const int knobSize = 48;
     const int labelH = 16;
-    const int comboW = 60;
-    const int comboH = 22;
+    const int comboH = 24;
 
     auto layoutKnobColumn = [&] (juce::Rectangle<int> col, juce::Slider& knob, juce::Label& label)
     {
@@ -383,10 +383,11 @@ void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIn
         case FX_FILTER:
         {
             int colW = area.getWidth() / 3;
-            // Combo gets a column
+            // Combo gets a column — use most of the column width
             auto comboCol = area.removeFromLeft (colW);
             fltTypeLabel.setBounds (comboCol.removeFromTop (labelH));
-            fltType.setBounds (comboCol.withSizeKeepingCentre (comboW, comboH));
+            int cw = juce::jmax (60, comboCol.getWidth() - 12);
+            fltType.setBounds (comboCol.withSizeKeepingCentre (cw, comboH));
 
             layoutKnobColumn (area.removeFromLeft (colW), fltCutoff, fltCutoffLabel);
             layoutKnobColumn (area, fltResonance, fltResonanceLabel);

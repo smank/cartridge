@@ -65,6 +65,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
         apvts, ParamIDs::ArpEnabled, arpEnable);
     arpEnable.setSize (0, 0);
 
+    arpPattern.addItemList ({ "Up", "Down", "Up-Down", "Random", "As Played" }, 1);
     arpPattern.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     arpPattern.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     arpPattern.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -96,6 +97,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     addChildComponent (arpGateLabel);
 
     // ─── DPCM ───────────────────────────────────────────────────────────
+    dpcmSample.addItemList ({ "Kick", "Snare", "Hi-Hat", "Tom" }, 1);
     dpcmSample.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     dpcmSample.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     dpcmSample.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -308,8 +310,7 @@ void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int m
 {
     const int knobSize = 48;
     const int labelH = 16;
-    const int comboW = 80;
-    const int comboH = 22;
+    const int comboH = 24;
 
     auto layoutKnobColumn = [&] (juce::Rectangle<int> col, juce::Slider& knob, juce::Label& label)
     {
@@ -340,10 +341,11 @@ void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int m
         case MOD_ARP:
         {
             int colW = area.getWidth() / 4;
-            // Combo gets a column
+            // Combo gets a column — use most of the column width
             auto comboCol = area.removeFromLeft (colW);
             arpPatternLabel.setBounds (comboCol.removeFromTop (labelH));
-            arpPattern.setBounds (comboCol.withSizeKeepingCentre (comboW, comboH));
+            int cw = juce::jmax (80, comboCol.getWidth() - 12);
+            arpPattern.setBounds (comboCol.withSizeKeepingCentre (cw, comboH));
 
             layoutKnobColumn (area.removeFromLeft (colW), arpRate, arpRateLabel);
             layoutKnobColumn (area.removeFromLeft (colW), arpOctaves, arpOctavesLabel);
@@ -355,7 +357,8 @@ void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int m
             // Center the combo box
             auto comboCol = area.withSizeKeepingCentre (area.getWidth() / 3, area.getHeight());
             dpcmSampleLabel.setBounds (comboCol.removeFromTop (labelH));
-            dpcmSample.setBounds (comboCol.withSizeKeepingCentre (comboW, comboH));
+            int cw = juce::jmax (80, comboCol.getWidth() - 12);
+            dpcmSample.setBounds (comboCol.withSizeKeepingCentre (cw, comboH));
             break;
         }
         default: break;
