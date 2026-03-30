@@ -42,34 +42,98 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
+      - name: Sign and notarize (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Import certificate into temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+          # Find signing identity
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Signing with: $IDENTITY"
+
+          # Sign all bundles with hardened runtime
+          ARTIFACTS=build/Cartridge_artefacts/Release
+          for bundle in \
+            "$ARTIFACTS/Standalone/Cartridge.app" \
+            "$ARTIFACTS/VST3/Cartridge.vst3" \
+            "$ARTIFACTS/AU/Cartridge.component" \
+            "$ARTIFACTS/CLAP/Cartridge.clap"; do
+            codesign --deep --force --options runtime --sign "$IDENTITY" "$bundle"
+          done
+
+          # Create zip for notarization
+          ditto -c -k --keepParent "$ARTIFACTS/Standalone/Cartridge.app" $RUNNER_TEMP/notarize.zip
+          ditto -c -k "$ARTIFACTS/VST3/Cartridge.vst3" $RUNNER_TEMP/notarize-vst3.zip
+          ditto -c -k "$ARTIFACTS/AU/Cartridge.component" $RUNNER_TEMP/notarize-au.zip
+          ditto -c -k "$ARTIFACTS/CLAP/Cartridge.clap" $RUNNER_TEMP/notarize-clap.zip
+
+          # Submit all for notarization
+          for zip in notarize.zip notarize-vst3.zip notarize-au.zip notarize-clap.zip; do
+            xcrun notarytool submit $RUNNER_TEMP/$zip \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_ID_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+          done
+
+          # Staple all bundles
+          for bundle in \
+            "$ARTIFACTS/Standalone/Cartridge.app" \
+            "$ARTIFACTS/VST3/Cartridge.vst3" \
+            "$ARTIFACTS/AU/Cartridge.component" \
+            "$ARTIFACTS/CLAP/Cartridge.clap"; do
+            xcrun stapler staple "$bundle"
+          done
+
+          # Cleanup
+          security delete-keychain "$KEYCHAIN_PATH"
+
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
-          mkdir -p staging
-          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
-          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
-          cp -R build/Cartridge_artefacts/Release/AU/ staging/
-          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
-          ditto -c -k --keepParent staging Cartridge-macOS.zip
+          mkdir -p Cartridge
+          cp -R build/Cartridge_artefacts/Release/VST3/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/AU/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ Cartridge/
+          ditto -c -k --keepParent Cartridge Cartridge-macOS.zip
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          mkdir -p staging
-          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
-          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
-          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
-          cd staging && 7z a ../Cartridge-Windows.zip .
+          mkdir -p Cartridge
+          cp -R build/Cartridge_artefacts/Release/VST3/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ Cartridge/
+          cd Cartridge && 7z a ../Cartridge-Windows.zip .
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          mkdir -p staging
-          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
-          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
-          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
-          cd staging && zip -r ../Cartridge-Linux.zip .
+          mkdir -p Cartridge
+          cp -R build/Cartridge_artefacts/Release/VST3/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ Cartridge/
+          cd Cartridge && zip -r ../Cartridge-Linux.zip .
 
       - name: Upload release archive
         uses: actions/upload-artifact@v6
