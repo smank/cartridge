@@ -109,31 +109,31 @@ jobs:
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
-          mkdir -p staging
-          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
-          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
-          cp -R build/Cartridge_artefacts/Release/AU/ staging/
-          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
-          ditto -c -k --keepParent staging Cartridge-macOS.zip
+          mkdir -p Cartridge
+          cp -R build/Cartridge_artefacts/Release/VST3/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/AU/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ Cartridge/
+          ditto -c -k --keepParent Cartridge Cartridge-macOS.zip
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          mkdir -p staging
-          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
-          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
-          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
-          cd staging && 7z a ../Cartridge-Windows.zip .
+          mkdir -p Cartridge
+          cp -R build/Cartridge_artefacts/Release/VST3/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ Cartridge/
+          cd Cartridge && 7z a ../Cartridge-Windows.zip .
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          mkdir -p staging
-          cp -R build/Cartridge_artefacts/Release/VST3/ staging/
-          cp -R build/Cartridge_artefacts/Release/CLAP/ staging/
-          cp -R build/Cartridge_artefacts/Release/Standalone/ staging/
-          cd staging && zip -r ../Cartridge-Linux.zip .
+          mkdir -p Cartridge
+          cp -R build/Cartridge_artefacts/Release/VST3/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/CLAP/ Cartridge/
+          cp -R build/Cartridge_artefacts/Release/Standalone/ Cartridge/
+          cd Cartridge && zip -r ../Cartridge-Linux.zip .
 
       - name: Upload release archive
         uses: actions/upload-artifact@v6
