@@ -128,6 +128,13 @@ private:
     std::atomic<float>* vrc6SawRateParam   = nullptr;
     std::atomic<float>* vrc6SawMixParam    = nullptr;
 
+    std::atomic<float>* p1TransposeParam     = nullptr;
+    std::atomic<float>* p2TransposeParam     = nullptr;
+    std::atomic<float>* triTransposeParam    = nullptr;
+    std::atomic<float>* vrc6P1TransposeParam = nullptr;
+    std::atomic<float>* vrc6P2TransposeParam = nullptr;
+    std::atomic<float>* vrc6SawTransposeParam = nullptr;
+
     std::atomic<float>* velocitySensParam  = nullptr;
     std::atomic<float>* pitchBendRangeParam = nullptr;
     std::atomic<float>* midiModeParam      = nullptr;

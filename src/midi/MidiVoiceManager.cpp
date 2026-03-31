@@ -1,13 +1,15 @@
 #include "MidiVoiceManager.h"
 #include "NoteFrequencyTable.h"
 #include "../dsp/ApuConstants.h"
+#include "../dsp/DpcmSamples.h"
 #include <cmath>
 
 namespace cart {
 
-float MidiVoiceManager::getAdjustedFrequency (int note, float bendSemitones) const
+float MidiVoiceManager::getAdjustedFrequency (int note, float bendSemitones, int nesChannel) const
 {
-    float adjustedNote = static_cast<float> (note) + bendSemitones + (masterTuneCents / 100.0f);
+    float transposeOffset = (nesChannel >= 0 && nesChannel < 8) ? transpose[nesChannel] : 0.0f;
+    float adjustedNote = static_cast<float> (note) + bendSemitones + transposeOffset + (masterTuneCents / 100.0f);
     return midiNoteToFrequency (adjustedNote);
 }
 
@@ -53,7 +55,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
         {
             case 1:  // Pulse 1
             {
-                float freq = getAdjustedFrequency (note, bendSemitones);
+                float freq = getAdjustedFrequency (note, bendSemitones, 0);
                 porta[0].setTarget (freq);
                 apuPtr->pulse1().setFrequency (porta[0].getCurrentFreq() > 0.0f ? porta[0].getCurrentFreq() : freq);
                 apuPtr->pulse1().envelope().setVolume (
@@ -64,7 +66,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             }
             case 2:  // Pulse 2
             {
-                float freq = getAdjustedFrequency (note, bendSemitones);
+                float freq = getAdjustedFrequency (note, bendSemitones, 1);
                 porta[1].setTarget (freq);
                 apuPtr->pulse2().setFrequency (porta[1].getCurrentFreq() > 0.0f ? porta[1].getCurrentFreq() : freq);
                 apuPtr->pulse2().envelope().setVolume (
@@ -75,7 +77,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             }
             case 3:  // Triangle
             {
-                float freq = getAdjustedFrequency (note, bendSemitones);
+                float freq = getAdjustedFrequency (note, bendSemitones, 2);
                 porta[2].setTarget (freq);
                 apuPtr->triangle().setFrequency (porta[2].getCurrentFreq() > 0.0f ? porta[2].getCurrentFreq() : freq);
                 apuPtr->triangle().noteOn();
@@ -96,6 +98,10 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             }
             case 4:  // DPCM
             {
+                // Note-to-sample mapping: specific MIDI notes trigger specific drums
+                int mappedSample = dpcmNoteToSampleIndex (note);
+                if (mappedSample >= 0)
+                    apuPtr->dpcm().loadSample (getDpcmSample (mappedSample));
                 apuPtr->dpcm().noteOn();
                 activeNotes[4] = note;
                 break;
@@ -104,7 +110,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             {
                 if (vrc6Available)
                 {
-                    float freq = getAdjustedFrequency (note, bendSemitones);
+                    float freq = getAdjustedFrequency (note, bendSemitones, 5);
                     porta[5].setTarget (freq);
                     float startFreq = porta[5].getCurrentFreq() > 0.0f ? porta[5].getCurrentFreq() : freq;
                     apuPtr->vrc6Pulse1().setVolume (static_cast<uint8_t> (vol * 15.0f));
@@ -117,7 +123,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             {
                 if (vrc6Available)
                 {
-                    float freq = getAdjustedFrequency (note, bendSemitones);
+                    float freq = getAdjustedFrequency (note, bendSemitones, 6);
                     porta[6].setTarget (freq);
                     float startFreq = porta[6].getCurrentFreq() > 0.0f ? porta[6].getCurrentFreq() : freq;
                     apuPtr->vrc6Pulse2().setVolume (static_cast<uint8_t> (vol * 15.0f));
@@ -130,7 +136,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             {
                 if (vrc6Available)
                 {
-                    float freq = getAdjustedFrequency (note, bendSemitones);
+                    float freq = getAdjustedFrequency (note, bendSemitones, 7);
                     porta[7].setTarget (freq);
                     float startFreq = porta[7].getCurrentFreq() > 0.0f ? porta[7].getCurrentFreq() : freq;
                     apuPtr->vrc6Saw().noteOn (startFreq);
@@ -145,7 +151,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
     else if (mode == MidiMode::Mono)
     {
         // Mono mode: play on Pulse 1 only
-        float freq = getAdjustedFrequency (note, bendSemitones);
+        float freq = getAdjustedFrequency (note, bendSemitones, 0);
         porta[0].setTarget (freq);
         apuPtr->pulse1().setFrequency (porta[0].getCurrentFreq() > 0.0f ? porta[0].getCurrentFreq() : freq);
         apuPtr->pulse1().envelope().setVolume (
@@ -155,79 +161,42 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
     }
     else if (mode == MidiMode::Auto)
     {
-        // Auto mode: route note to ALL enabled channels
-        float freq = getAdjustedFrequency (note, bendSemitones);
+        // Auto poly: round-robin across ALL enabled channels
+        static constexpr int allSlots[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
 
-        if (channelEnabled[0])
+        int candidates[8];
+        int numCandidates = 0;
+        for (int s : allSlots)
         {
-            porta[0].setTarget (freq);
-            apuPtr->pulse1().setFrequency (porta[0].getCurrentFreq() > 0.0f ? porta[0].getCurrentFreq() : freq);
-            apuPtr->pulse1().envelope().setVolume (
-                static_cast<uint8_t> (vol * 15.0f));
-            apuPtr->pulse1().noteOn();
-            activeNotes[0] = note;
+            if (! channelEnabled[s]) continue;
+            if (s >= 5 && ! vrc6Available) continue;
+            candidates[numCandidates++] = s;
         }
 
-        if (channelEnabled[1])
-        {
-            porta[1].setTarget (freq);
-            apuPtr->pulse2().setFrequency (porta[1].getCurrentFreq() > 0.0f ? porta[1].getCurrentFreq() : freq);
-            apuPtr->pulse2().envelope().setVolume (
-                static_cast<uint8_t> (vol * 15.0f));
-            apuPtr->pulse2().noteOn();
-            activeNotes[1] = note;
-        }
+        if (numCandidates == 0)
+            return;
 
-        if (channelEnabled[2])
+        // Prefer a free channel, starting from round-robin position
+        int chosen = -1;
+        for (int i = 0; i < numCandidates; ++i)
         {
-            porta[2].setTarget (freq);
-            apuPtr->triangle().setFrequency (porta[2].getCurrentFreq() > 0.0f ? porta[2].getCurrentFreq() : freq);
-            apuPtr->triangle().noteOn();
-            activeNotes[2] = note;
-        }
-
-        if (channelEnabled[3])
-        {
-            int periodIndex = 15 - std::clamp ((note - 36) * 16 / 60, 0, 15);
-            apuPtr->noise().setPeriodIndex (periodIndex, isNtsc);
-            apuPtr->noise().envelope().setVolume (
-                static_cast<uint8_t> (vol * 15.0f));
-            apuPtr->noise().noteOn();
-            activeNotes[3] = note;
-        }
-
-        if (channelEnabled[4])
-        {
-            apuPtr->dpcm().noteOn();
-            activeNotes[4] = note;
-        }
-
-        if (vrc6Available)
-        {
-            if (channelEnabled[5])
+            int idx = (nextAutoChannel + i) % numCandidates;
+            if (activeNotes[candidates[idx]] < 0)
             {
-                porta[5].setTarget (freq);
-                float startFreq = porta[5].getCurrentFreq() > 0.0f ? porta[5].getCurrentFreq() : freq;
-                apuPtr->vrc6Pulse1().setVolume (static_cast<uint8_t> (vol * 15.0f));
-                apuPtr->vrc6Pulse1().noteOn (startFreq);
-                activeNotes[5] = note;
-            }
-            if (channelEnabled[6])
-            {
-                porta[6].setTarget (freq);
-                float startFreq = porta[6].getCurrentFreq() > 0.0f ? porta[6].getCurrentFreq() : freq;
-                apuPtr->vrc6Pulse2().setVolume (static_cast<uint8_t> (vol * 15.0f));
-                apuPtr->vrc6Pulse2().noteOn (startFreq);
-                activeNotes[6] = note;
-            }
-            if (channelEnabled[7])
-            {
-                porta[7].setTarget (freq);
-                float startFreq = porta[7].getCurrentFreq() > 0.0f ? porta[7].getCurrentFreq() : freq;
-                apuPtr->vrc6Saw().noteOn (startFreq);
-                activeNotes[7] = note;
+                chosen = idx;
+                break;
             }
         }
+
+        // All channels busy — steal the round-robin slot
+        if (chosen < 0)
+        {
+            chosen = nextAutoChannel % numCandidates;
+            noteOffChannel (candidates[chosen]);
+        }
+
+        noteOnChannel (candidates[chosen], note, vol, bendSemitones);
+        nextAutoChannel = (chosen + 1) % numCandidates;
     }
 }
 
@@ -336,7 +305,7 @@ void MidiVoiceManager::handlePitchBend (int channel, int bendValue)
         {
             if (activeNotes[nesChannel] >= 0)
             {
-                float freq = getAdjustedFrequency (activeNotes[nesChannel], bendSemitones);
+                float freq = getAdjustedFrequency (activeNotes[nesChannel], bendSemitones, nesChannel);
                 ch.setFrequency (freq);
             }
         };
@@ -356,7 +325,7 @@ void MidiVoiceManager::handlePitchBend (int channel, int bendValue)
     {
         if (activeNotes[0] >= 0)
         {
-            float freq = getAdjustedFrequency (activeNotes[0], bendSemitones);
+            float freq = getAdjustedFrequency (activeNotes[0], bendSemitones, 0);
             apuPtr->pulse1().setFrequency (freq);
         }
     }
@@ -365,7 +334,7 @@ void MidiVoiceManager::handlePitchBend (int channel, int bendValue)
         auto updateIfActive = [&] (int idx, auto& ch)
         {
             if (activeNotes[idx] >= 0)
-                ch.setFrequency (getAdjustedFrequency (activeNotes[idx], bendSemitones));
+                ch.setFrequency (getAdjustedFrequency (activeNotes[idx], bendSemitones, idx));
         };
         updateIfActive (0, apuPtr->pulse1());
         updateIfActive (1, apuPtr->pulse2());
@@ -441,7 +410,7 @@ void MidiVoiceManager::applyPitchMultiplier (float multiplier)
     {
         if (activeNotes[i] < 0) continue;
 
-        float freq = midiNoteToFrequency (static_cast<float> (activeNotes[i]) + masterTuneCents / 100.0f) * multiplier;
+        float freq = midiNoteToFrequency (static_cast<float> (activeNotes[i]) + transpose[i] + masterTuneCents / 100.0f) * multiplier;
 
         switch (i)
         {
@@ -454,6 +423,82 @@ void MidiVoiceManager::applyPitchMultiplier (float multiplier)
             default: break;
         }
     }
+}
+
+void MidiVoiceManager::noteOnChannel (int ch, int note, float vol, float bendSemitones)
+{
+    float freq = getAdjustedFrequency (note, bendSemitones, ch);
+
+    switch (ch)
+    {
+        case 0:
+            porta[0].setTarget (freq);
+            apuPtr->pulse1().setFrequency (porta[0].getCurrentFreq() > 0.0f ? porta[0].getCurrentFreq() : freq);
+            apuPtr->pulse1().envelope().setVolume (static_cast<uint8_t> (vol * 15.0f));
+            apuPtr->pulse1().noteOn();
+            break;
+        case 1:
+            porta[1].setTarget (freq);
+            apuPtr->pulse2().setFrequency (porta[1].getCurrentFreq() > 0.0f ? porta[1].getCurrentFreq() : freq);
+            apuPtr->pulse2().envelope().setVolume (static_cast<uint8_t> (vol * 15.0f));
+            apuPtr->pulse2().noteOn();
+            break;
+        case 2:
+            porta[2].setTarget (freq);
+            apuPtr->triangle().setFrequency (porta[2].getCurrentFreq() > 0.0f ? porta[2].getCurrentFreq() : freq);
+            apuPtr->triangle().noteOn();
+            break;
+        case 3:
+        {
+            int periodIndex = 15 - std::clamp ((note - 36) * 16 / 60, 0, 15);
+            apuPtr->noise().setPeriodIndex (periodIndex, isNtsc);
+            apuPtr->noise().envelope().setVolume (static_cast<uint8_t> (vol * 15.0f));
+            apuPtr->noise().noteOn();
+            break;
+        }
+        case 4:
+        {
+            // Note-to-sample mapping for DPCM in Auto mode
+            int mappedSample = dpcmNoteToSampleIndex (note);
+            if (mappedSample >= 0)
+                apuPtr->dpcm().loadSample (getDpcmSample (mappedSample));
+            apuPtr->dpcm().noteOn();
+            break;
+        }
+        case 5:
+            porta[5].setTarget (freq);
+            apuPtr->vrc6Pulse1().setVolume (static_cast<uint8_t> (vol * 15.0f));
+            apuPtr->vrc6Pulse1().noteOn (porta[5].getCurrentFreq() > 0.0f ? porta[5].getCurrentFreq() : freq);
+            break;
+        case 6:
+            porta[6].setTarget (freq);
+            apuPtr->vrc6Pulse2().setVolume (static_cast<uint8_t> (vol * 15.0f));
+            apuPtr->vrc6Pulse2().noteOn (porta[6].getCurrentFreq() > 0.0f ? porta[6].getCurrentFreq() : freq);
+            break;
+        case 7:
+            porta[7].setTarget (freq);
+            apuPtr->vrc6Saw().noteOn (porta[7].getCurrentFreq() > 0.0f ? porta[7].getCurrentFreq() : freq);
+            break;
+        default: break;
+    }
+    activeNotes[ch] = note;
+}
+
+void MidiVoiceManager::noteOffChannel (int ch)
+{
+    switch (ch)
+    {
+        case 0: apuPtr->pulse1().noteOff();    break;
+        case 1: apuPtr->pulse2().noteOff();    break;
+        case 2: apuPtr->triangle().noteOff();  break;
+        case 3: apuPtr->noise().noteOff();     break;
+        case 4: apuPtr->dpcm().noteOff();      break;
+        case 5: apuPtr->vrc6Pulse1().noteOff(); break;
+        case 6: apuPtr->vrc6Pulse2().noteOff(); break;
+        case 7: apuPtr->vrc6Saw().noteOff();    break;
+        default: break;
+    }
+    activeNotes[ch] = -1;
 }
 
 } // namespace cart

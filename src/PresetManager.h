@@ -10,6 +10,7 @@ namespace cart {
 struct Preset
 {
     juce::String name;
+    juce::String category;  // Empty for uncategorized user presets
     std::vector<std::pair<juce::String, float>> values;  // paramID → value
 };
 
@@ -28,6 +29,28 @@ public:
     void refreshUserPresets();
     bool isFactoryPreset (int index) const { return index < static_cast<int> (factoryCount); }
     int getFactoryPresetCount() const { return static_cast<int> (factoryCount); }
+
+    /// Export current state as a single .cartpreset file
+    void exportPreset (const juce::String& name,
+                       juce::AudioProcessorValueTreeState& apvts,
+                       const juce::File& destFile);
+
+    /// Export a bank of presets as a .cartbank file
+    void exportBank (const juce::String& bankName,
+                     const std::vector<int>& presetIndices,
+                     const juce::File& destFile) const;
+
+    /// Import a .cartpreset file — returns the index of the newly added preset, or -1
+    int importPreset (const juce::File& file);
+
+    /// Import a .cartbank file — returns number of presets imported
+    int importBank (const juce::File& file);
+
+    /// Get ordered list of unique user preset categories (for PresetComboBox sections)
+    std::vector<juce::String> getUserCategories() const;
+
+    /// Get the Preset struct at index (for category info)
+    const Preset* getPreset (int index) const;
 
 private:
     void buildPresets();

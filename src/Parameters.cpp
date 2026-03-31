@@ -154,6 +154,31 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
         juce::ParameterID { ParamIDs::Vrc6SawMix, 1 }, "VRC6 Saw Mix",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 1.0f));
 
+    // ─── Per-Channel Transpose ────────────────────────────────────────
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::P1Transpose, 1 }, "Pulse 1 Transpose",
+        -24, 24, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::P2Transpose, 1 }, "Pulse 2 Transpose",
+        -24, 24, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::TriTranspose, 1 }, "Triangle Transpose",
+        -24, 24, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::Vrc6P1Transpose, 1 }, "VRC6 Pulse 1 Transpose",
+        -24, 24, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::Vrc6P2Transpose, 1 }, "VRC6 Pulse 2 Transpose",
+        -24, 24, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::Vrc6SawTranspose, 1 }, "VRC6 Saw Transpose",
+        -24, 24, 0, juce::AudioParameterIntAttributes().withLabel ("st")));
+
     // ─── Modern Enhancements ────────────────────────────────────────────
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { ParamIDs::VelocitySens, 1 },
