@@ -1,6 +1,8 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
+#include <vector>
 
 namespace cart {
 
@@ -10,6 +12,17 @@ public:
     using juce::ComboBox::ComboBox;
 
     void setFactoryPresetCount (int count) { factoryPresetCount = count; }
+
+    /// Set user category info for the popup menu.
+    /// Each entry is { categoryName, [presetIndices...] }.
+    /// Uncategorized user presets have an empty category name.
+    struct UserCategory
+    {
+        juce::String name;
+        std::vector<int> indices;  // preset indices (0-based)
+    };
+
+    void setUserCategories (std::vector<UserCategory> cats) { userCategories = std::move (cats); }
 
     void showPopup() override
     {
@@ -28,6 +41,8 @@ public:
             //--- column 3 ---
             { "WITH EFFECTS",     19, 20, true  },
             { "ARP & SHOWCASE",   21, 24, false },
+            //--- column 4 ---
+            { "GAME INSPIRED",    25, 29, true  },
         };
 
         int numItems = getNumItems();
@@ -50,16 +65,48 @@ public:
             }
         }
 
-        // User presets in rightmost column
+        // User presets — organized by category
         if (factoryPresetCount > 0 && numItems > factoryPresetCount)
         {
-            menu.addColumnBreak();
-            menu.addSectionHeader ("USER PRESETS");
+            bool needsColumnBreak = true;
 
-            for (int i = factoryPresetCount; i < numItems; ++i)
+            if (! userCategories.empty())
             {
-                int itemId = i + 1;
-                menu.addItem (itemId, getItemText (i), true, itemId == selectedId);
+                // Show categorized presets first
+                for (const auto& cat : userCategories)
+                {
+                    if (cat.indices.empty()) continue;
+
+                    if (needsColumnBreak)
+                    {
+                        menu.addColumnBreak();
+                        needsColumnBreak = false;
+                    }
+
+                    juce::String header = cat.name.isEmpty() ? "USER PRESETS" : cat.name.toUpperCase();
+                    menu.addSectionHeader (header);
+
+                    for (int idx : cat.indices)
+                    {
+                        if (idx >= 0 && idx < numItems)
+                        {
+                            int itemId = idx + 1;
+                            menu.addItem (itemId, getItemText (idx), true, itemId == selectedId);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Flat list fallback
+                menu.addColumnBreak();
+                menu.addSectionHeader ("USER PRESETS");
+
+                for (int i = factoryPresetCount; i < numItems; ++i)
+                {
+                    int itemId = i + 1;
+                    menu.addItem (itemId, getItemText (i), true, itemId == selectedId);
+                }
             }
         }
 
@@ -79,6 +126,7 @@ public:
 
 private:
     int factoryPresetCount = 0;
+    std::vector<UserCategory> userCategories;
 };
 
 } // namespace cart

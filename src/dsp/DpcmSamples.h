@@ -174,6 +174,20 @@ static constexpr std::array<uint8_t, 160> kDpcmTom = {{
 // ─── Sample count ───────────────────────────────────────────────────────────
 inline constexpr int kNumDpcmSamples = 4;
 
+/// Maps a MIDI note number to a DPCM sample index (GM drum subset).
+/// Returns -1 if no mapping exists (use current param selection).
+inline int dpcmNoteToSampleIndex (int midiNote)
+{
+    switch (midiNote)
+    {
+        case 36: return 0;  // C2 → Kick
+        case 38: return 1;  // D2 → Snare
+        case 42: return 2;  // F#2 → Hi-Hat
+        case 45: return 3;  // A2 → Tom
+        default: return -1; // Use current param
+    }
+}
+
 /// Returns the DPCM sample data for the given index:
 ///   0 = Kick, 1 = Snare, 2 = Hi-Hat Closed, 3 = Tom
 inline std::vector<uint8_t> getDpcmSample (int index)

@@ -35,6 +35,9 @@ void PresetManager::savePresetToFile (const Preset& preset, const juce::File& fi
     auto xml = std::make_unique<juce::XmlElement> ("CartridgePreset");
     xml->setAttribute ("name", preset.name);
 
+    if (preset.category.isNotEmpty())
+        xml->setAttribute ("category", preset.category);
+
     for (const auto& [paramID, value] : preset.values)
     {
         auto* paramEl = xml->createNewChildElement ("Param");
@@ -53,6 +56,7 @@ std::optional<Preset> PresetManager::loadPresetFromFile (const juce::File& file)
 
     Preset p;
     p.name = xml->getStringAttribute ("name", file.getFileNameWithoutExtension());
+    p.category = xml->getStringAttribute ("category", "");
 
     for (auto* paramEl : xml->getChildIterator())
     {
@@ -159,6 +163,14 @@ PresetManager::PresetManager()
         { ParamIDs::Vrc6P2Mix,        1.0f },
         { ParamIDs::Vrc6SawRate,      42.0f },
         { ParamIDs::Vrc6SawMix,       1.0f },
+
+        // Per-channel transpose
+        { ParamIDs::P1Transpose,      0.0f },
+        { ParamIDs::P2Transpose,      0.0f },
+        { ParamIDs::TriTranspose,     0.0f },
+        { ParamIDs::Vrc6P1Transpose,  0.0f },
+        { ParamIDs::Vrc6P2Transpose,  0.0f },
+        { ParamIDs::Vrc6SawTranspose, 0.0f },
 
         // Modern
         { ParamIDs::VelocitySens,     0.0f },
@@ -624,6 +636,272 @@ void PresetManager::buildPresets()
         { ParamIDs::DlFeedback,    0.45f },
         { ParamIDs::DlMix,         0.3f },
     }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  GAME INSPIRED (26–30)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 26. Planet Surface — Exploration atmosphere
+    presets.push_back (makePreset ("Planet Surface", {
+        { ParamIDs::P1Duty,           0.0f },   // 12.5%
+        { ParamIDs::P1Volume,         13.0f },
+        { ParamIDs::P1ConstVol,       1.0f },
+        { ParamIDs::TriEnabled,       1.0f },
+        { ParamIDs::VelocitySens,     0.3f },
+        { ParamIDs::ChEnabled,        1.0f },
+        { ParamIDs::ChRate,           0.3f },
+        { ParamIDs::ChDepth,          0.3f },
+        { ParamIDs::ChMix,            0.3f },
+        { ParamIDs::RvEnabled,        1.0f },
+        { ParamIDs::RvSize,           0.6f },
+        { ParamIDs::RvMix,            0.25f },
+        { ParamIDs::DlEnabled,        1.0f },
+        { ParamIDs::DlTime,           450.0f },
+        { ParamIDs::DlFeedback,       0.4f },
+        { ParamIDs::DlMix,            0.2f },
+    }));
+
+    // 27. Underground Lair — Dark dungeon tension
+    presets.push_back (makePreset ("Underground Lair", {
+        { ParamIDs::P1Duty,           1.0f },   // 25%
+        { ParamIDs::P1Volume,         10.0f },
+        { ParamIDs::P1ConstVol,       0.0f },   // Envelope decay
+        { ParamIDs::NoiseEnabled,     1.0f },
+        { ParamIDs::NoiseMode,        0.0f },   // Long
+        { ParamIDs::NoisePeriod,      8.0f },
+        { ParamIDs::NoiseVolume,      6.0f },
+        { ParamIDs::NoiseConstVol,    0.0f },   // Envelope decay
+        { ParamIDs::FltEnabled,       1.0f },
+        { ParamIDs::FltType,          0.0f },   // LP
+        { ParamIDs::FltCutoff,        500.0f },
+        { ParamIDs::FltResonance,     1.5f },
+        { ParamIDs::RvEnabled,        1.0f },
+        { ParamIDs::RvSize,           0.7f },
+        { ParamIDs::RvDamping,        0.7f },
+        { ParamIDs::RvMix,            0.3f },
+    }));
+
+    // 28. Emergency Exit — Urgent action
+    presets.push_back (makePreset ("Emergency Exit", {
+        { ParamIDs::P1Duty,           2.0f },   // 50%
+        { ParamIDs::P1Volume,         15.0f },
+        { ParamIDs::P1ConstVol,       1.0f },
+        { ParamIDs::P1SweepEnable,    1.0f },
+        { ParamIDs::P1SweepPeriod,    3.0f },
+        { ParamIDs::P1SweepNegate,    0.0f },   // Pitch down
+        { ParamIDs::P1SweepShift,     4.0f },
+        { ParamIDs::BcEnabled,        1.0f },
+        { ParamIDs::BcBitDepth,       10.0f },
+        { ParamIDs::BcRateReduce,     3.0f },
+        { ParamIDs::BcMix,            0.6f },
+        { ParamIDs::DlEnabled,        1.0f },
+        { ParamIDs::DlTime,           200.0f },
+        { ParamIDs::DlFeedback,       0.3f },
+        { ParamIDs::DlMix,            0.2f },
+    }));
+
+    // 29. Hidden Chamber — Mysterious discovery
+    presets.push_back (makePreset ("Hidden Chamber", {
+        { ParamIDs::P1Enabled,        0.0f },
+        { ParamIDs::TriEnabled,       1.0f },
+        { ParamIDs::ChEnabled,        1.0f },
+        { ParamIDs::ChRate,           0.2f },
+        { ParamIDs::ChDepth,          0.4f },
+        { ParamIDs::ChMix,            0.35f },
+        { ParamIDs::DlEnabled,        1.0f },
+        { ParamIDs::DlTime,           600.0f },
+        { ParamIDs::DlFeedback,       0.55f },
+        { ParamIDs::DlMix,            0.3f },
+        { ParamIDs::RvEnabled,        1.0f },
+        { ParamIDs::RvSize,           0.9f },
+        { ParamIDs::RvDamping,        0.2f },
+        { ParamIDs::RvWidth,          1.0f },
+        { ParamIDs::RvMix,            0.45f },
+    }));
+
+    // 30. Surface Tension — Overworld action theme
+    presets.push_back (makePreset ("Surface Tension", {
+        { ParamIDs::P1Duty,           1.0f },   // 25%
+        { ParamIDs::P1Volume,         15.0f },
+        { ParamIDs::P2Enabled,        1.0f },
+        { ParamIDs::P2Duty,           2.0f },   // 50%
+        { ParamIDs::P2Volume,         12.0f },
+        { ParamIDs::TriEnabled,       1.0f },
+        { ParamIDs::NoiseEnabled,     1.0f },
+        { ParamIDs::NoisePeriod,      5.0f },
+        { ParamIDs::NoiseVolume,      15.0f },
+        { ParamIDs::NoiseConstVol,    0.0f },   // Envelope decay
+        { ParamIDs::Vrc6Enabled,      1.0f },
+        { ParamIDs::Vrc6P1Mix,        0.0f },   // Mute VRC6 Pulse 1
+        { ParamIDs::Vrc6P2Mix,        0.0f },   // Mute VRC6 Pulse 2
+        { ParamIDs::Vrc6SawRate,      42.0f },  // Saw bass
+        { ParamIDs::Vrc6SawMix,       1.0f },
+        { ParamIDs::VelocitySens,     0.4f },
+        { ParamIDs::MidiMode,         0.0f },   // Split
+    }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Import / Export
+// ═══════════════════════════════════════════════════════════════════════════
+
+void PresetManager::exportPreset (const juce::String& name,
+                                  juce::AudioProcessorValueTreeState& apvts,
+                                  const juce::File& destFile)
+{
+    Preset p;
+    p.name = name;
+
+    for (const auto& [paramID, defaultVal] : defaults)
+    {
+        if (auto* param = apvts.getParameter (paramID))
+            p.values.push_back ({ paramID, param->convertFrom0to1 (param->getValue()) });
+    }
+
+    savePresetToFile (p, destFile);
+}
+
+void PresetManager::exportBank (const juce::String& bankName,
+                                const std::vector<int>& presetIndices,
+                                const juce::File& destFile) const
+{
+    auto xml = std::make_unique<juce::XmlElement> ("CartridgeBank");
+    xml->setAttribute ("name", bankName);
+
+    for (int idx : presetIndices)
+    {
+        if (idx < 0 || idx >= static_cast<int> (presets.size()))
+            continue;
+
+        const auto& preset = presets[static_cast<size_t> (idx)];
+        auto* presetEl = xml->createNewChildElement ("CartridgePreset");
+        presetEl->setAttribute ("name", preset.name);
+
+        if (preset.category.isNotEmpty())
+            presetEl->setAttribute ("category", preset.category);
+
+        for (const auto& [paramID, value] : preset.values)
+        {
+            auto* paramEl = presetEl->createNewChildElement ("Param");
+            paramEl->setAttribute ("id", paramID);
+            paramEl->setAttribute ("value", static_cast<double> (value));
+        }
+    }
+
+    xml->writeTo (destFile);
+}
+
+int PresetManager::importPreset (const juce::File& file)
+{
+    auto xml = juce::XmlDocument::parse (file);
+    if (xml == nullptr)
+        return -1;
+
+    // Single preset file
+    if (xml->hasTagName ("CartridgePreset"))
+    {
+        Preset p;
+        p.name = xml->getStringAttribute ("name", file.getFileNameWithoutExtension());
+        p.category = xml->getStringAttribute ("category", "");
+
+        for (auto* paramEl : xml->getChildIterator())
+        {
+            if (paramEl->hasTagName ("Param"))
+            {
+                auto id = paramEl->getStringAttribute ("id");
+                auto val = static_cast<float> (paramEl->getDoubleAttribute ("value"));
+                p.values.push_back ({ id, val });
+            }
+        }
+
+        // Save to user preset directory and reload
+        auto destFile = getUserPresetDirectory().getChildFile (p.name + ".xml");
+        savePresetToFile (p, destFile);
+        refreshUserPresets();
+        return static_cast<int> (presets.size()) - 1;
+    }
+
+    // Bank file — delegate to importBank
+    if (xml->hasTagName ("CartridgeBank"))
+    {
+        int count = importBank (file);
+        return count > 0 ? static_cast<int> (presets.size()) - 1 : -1;
+    }
+
+    return -1;
+}
+
+int PresetManager::importBank (const juce::File& file)
+{
+    auto xml = juce::XmlDocument::parse (file);
+    if (xml == nullptr || ! xml->hasTagName ("CartridgeBank"))
+        return 0;
+
+    juce::String bankName = xml->getStringAttribute ("name", file.getFileNameWithoutExtension());
+    int imported = 0;
+
+    for (auto* presetEl : xml->getChildIterator())
+    {
+        if (! presetEl->hasTagName ("CartridgePreset"))
+            continue;
+
+        Preset p;
+        p.name = presetEl->getStringAttribute ("name", "Imported " + juce::String (imported + 1));
+        p.category = presetEl->getStringAttribute ("category", bankName);
+
+        // If no category was set on the preset, use the bank name
+        if (p.category.isEmpty())
+            p.category = bankName;
+
+        for (auto* paramEl : presetEl->getChildIterator())
+        {
+            if (paramEl->hasTagName ("Param"))
+            {
+                auto id = paramEl->getStringAttribute ("id");
+                auto val = static_cast<float> (paramEl->getDoubleAttribute ("value"));
+                p.values.push_back ({ id, val });
+            }
+        }
+
+        auto destFile = getUserPresetDirectory().getChildFile (p.name + ".xml");
+        savePresetToFile (p, destFile);
+        ++imported;
+    }
+
+    if (imported > 0)
+        refreshUserPresets();
+
+    return imported;
+}
+
+std::vector<juce::String> PresetManager::getUserCategories() const
+{
+    std::vector<juce::String> cats;
+
+    for (size_t i = factoryCount; i < presets.size(); ++i)
+    {
+        const auto& cat = presets[i].category;
+        if (cat.isNotEmpty())
+        {
+            // Add only if not already present (preserve order)
+            bool found = false;
+            for (const auto& c : cats)
+            {
+                if (c == cat) { found = true; break; }
+            }
+            if (! found)
+                cats.push_back (cat);
+        }
+    }
+
+    return cats;
+}
+
+const Preset* PresetManager::getPreset (int index) const
+{
+    if (index >= 0 && index < static_cast<int> (presets.size()))
+        return &presets[static_cast<size_t> (index)];
+    return nullptr;
 }
 
 } // namespace cart

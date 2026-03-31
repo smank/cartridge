@@ -104,6 +104,10 @@ private:
     juce::Slider noisePeriodKnob;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> noisePeriodAttach;
 
+    // Transpose knob (melodic channels only)
+    juce::Slider transposeKnob;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> transposeAttach;
+
     // Mix fader
     juce::Slider mixFader;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttach;
@@ -112,6 +116,7 @@ private:
     bool hasVolume = true;
     bool hasMainCombo = false;
     bool hasMainKnob = false;
+    bool hasTranspose = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelStripComponent)
 };

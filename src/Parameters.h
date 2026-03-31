@@ -68,6 +68,14 @@ namespace ParamIDs {
     inline constexpr const char* Vrc6SawRate      = "vrc6SawRate";
     inline constexpr const char* Vrc6SawMix       = "vrc6SawMix";
 
+    // Per-channel transpose (melodic channels only)
+    inline constexpr const char* P1Transpose      = "p1Transpose";
+    inline constexpr const char* P2Transpose      = "p2Transpose";
+    inline constexpr const char* TriTranspose     = "triTranspose";
+    inline constexpr const char* Vrc6P1Transpose  = "vrc6P1Transpose";
+    inline constexpr const char* Vrc6P2Transpose  = "vrc6P2Transpose";
+    inline constexpr const char* Vrc6SawTranspose = "vrc6SawTranspose";
+
     // Modern enhancements
     inline constexpr const char* VelocitySens     = "velocitySens";
     inline constexpr const char* PitchBendRange   = "pitchBendRange";

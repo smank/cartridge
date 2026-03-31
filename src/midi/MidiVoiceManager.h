@@ -40,6 +40,12 @@ public:
     /// Channel enabled state (for Auto mode routing)
     void setChannelEnabled (int nesChannel, bool en) { channelEnabled[nesChannel] = en; }
 
+    /// Per-channel transpose in semitones (melodic channels only)
+    void setTranspose (int nesChannel, float semitones) { transpose[nesChannel] = semitones; }
+
+    /// Set the fallback DPCM sample index (used when note mapping returns -1)
+    void setDpcmSample (int idx) { dpcmSampleParam = idx; }
+
     /// Process a single MIDI message
     void processMidiMessage (const juce::MidiMessage& msg);
 
@@ -66,7 +72,7 @@ private:
     void handleNoteOff (int channel, int note);
     void handlePitchBend (int channel, int bendValue);
 
-    float getAdjustedFrequency (int note, float bendSemitones = 0.0f) const;
+    float getAdjustedFrequency (int note, float bendSemitones = 0.0f, int nesChannel = -1) const;
 
     Apu*   apuPtr              = nullptr;
     MidiMode  mode                = MidiMode::Split;
@@ -76,11 +82,18 @@ private:
     int       pitchBendSemitones  = 2;
     float     masterTuneCents     = 0.0f;
 
+    float     transpose[8]        = {};   // Semitones per NES channel
+    int       dpcmSampleParam     = 0;    // Fallback DPCM sample index
+
     // Per-channel state for pitch bend
     float     pitchBendValues[16] = {};   // Normalized -1 to 1
     // Channels: 0=P1, 1=P2, 2=Tri, 3=Noise, 4=DPCM, 5=VRC6P1, 6=VRC6P2, 7=VRC6Saw
     int       activeNotes[8]      = { -1, -1, -1, -1, -1, -1, -1, -1 };
     bool      channelEnabled[8]   = { true, false, false, false, false, false, false, false };
+    int       nextAutoChannel     = 0;    // Round-robin index for Auto poly
+
+    void noteOnChannel (int nesChannel, int note, float vol, float bendSemitones);
+    void noteOffChannel (int nesChannel);
 };
 
 } // namespace cart

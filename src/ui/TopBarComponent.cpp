@@ -70,6 +70,66 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     };
     addAndMakeVisible (saveButton);
 
+    // Import button
+    styleBtn (importButton);
+    importButton.onClick = [this]
+    {
+        auto chooser = std::make_shared<juce::FileChooser> (
+            "Import Preset or Bank",
+            juce::File::getSpecialLocation (juce::File::userDesktopDirectory),
+            "*.cartpreset;*.cartbank;*.xml");
+
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [this, chooser] (const juce::FileChooser& fc)
+            {
+                auto file = fc.getResult();
+                if (! file.existsAsFile()) return;
+
+                auto& pm = processorRef.getPresetManager();
+                int result = -1;
+
+                if (file.getFileExtension() == ".cartbank")
+                    result = pm.importBank (file) > 0 ? pm.getNumPresets() - 1 : -1;
+                else
+                    result = pm.importPreset (file);
+
+                if (result >= 0)
+                {
+                    populatePresets();
+                    selectPreset (result);
+                }
+            });
+    };
+    addAndMakeVisible (importButton);
+
+    // Export button
+    styleBtn (exportButton);
+    exportButton.onClick = [this]
+    {
+        auto chooser = std::make_shared<juce::FileChooser> (
+            "Export Preset",
+            juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
+                .getChildFile (processorRef.getProgramName (processorRef.getCurrentProgram()) + ".cartpreset"),
+            "*.cartpreset");
+
+        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
+            [this, chooser] (const juce::FileChooser& fc)
+            {
+                auto file = fc.getResult();
+                if (file == juce::File{}) return;
+
+                auto destFile = file.getFileExtension().isEmpty()
+                    ? file.withFileExtension ("cartpreset")
+                    : file;
+
+                processorRef.getPresetManager().exportPreset (
+                    processorRef.getProgramName (processorRef.getCurrentProgram()),
+                    processorRef.getApvts(),
+                    destFile);
+            });
+    };
+    addAndMakeVisible (exportButton);
+
     // Panic button
     panicButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
     panicButton.setColour (juce::TextButton::textColourOffId, Colors::fxBright);
@@ -152,7 +212,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     pitchBendAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::PitchBendRange, pitchBendSlider);
 
-    pitchBendLabel.setText ("PB", juce::dontSendNotification);
+    pitchBendLabel.setText ("Bend", juce::dontSendNotification);
     pitchBendLabel.setFont (juce::FontOptions (11.0f));
     pitchBendLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
     addAndMakeVisible (pitchBendLabel);
@@ -228,7 +288,52 @@ void TopBarComponent::populatePresets()
         presetCombo.addItem (processorRef.getProgramName (i), i + 1);
 
     presetCombo.setFactoryPresetCount (processorRef.getPresetManager().getFactoryPresetCount());
+    refreshUserCategories();
     presetCombo.setSelectedId (processorRef.getCurrentProgram() + 1, juce::dontSendNotification);
+}
+
+void TopBarComponent::refreshUserCategories()
+{
+    auto& pm = processorRef.getPresetManager();
+    int factoryCount = pm.getFactoryPresetCount();
+    int total = pm.getNumPresets();
+
+    auto catNames = pm.getUserCategories();
+
+    std::vector<PresetComboBox::UserCategory> cats;
+
+    // Build category groups
+    for (const auto& catName : catNames)
+    {
+        PresetComboBox::UserCategory uc;
+        uc.name = catName;
+
+        for (int i = factoryCount; i < total; ++i)
+        {
+            if (auto* p = pm.getPreset (i))
+            {
+                if (p->category == catName)
+                    uc.indices.push_back (i);
+            }
+        }
+
+        cats.push_back (std::move (uc));
+    }
+
+    // Uncategorized user presets
+    PresetComboBox::UserCategory uncategorized;
+    for (int i = factoryCount; i < total; ++i)
+    {
+        if (auto* p = pm.getPreset (i))
+        {
+            if (p->category.isEmpty())
+                uncategorized.indices.push_back (i);
+        }
+    }
+    if (! uncategorized.indices.empty())
+        cats.push_back (std::move (uncategorized));
+
+    presetCombo.setUserCategories (std::move (cats));
 }
 
 void TopBarComponent::selectPreset (int index)
@@ -298,6 +403,10 @@ void TopBarComponent::resized()
     nextButton.setBounds (row1.removeFromLeft (26));
     row1.removeFromLeft (2);
     saveButton.setBounds (row1.removeFromLeft (40));
+    row1.removeFromLeft (2);
+    importButton.setBounds (row1.removeFromLeft (48));
+    row1.removeFromLeft (2);
+    exportButton.setBounds (row1.removeFromLeft (48));
     row1.removeFromLeft (6);
 
     int presetW = juce::jmin (220, row1.getWidth() / 3);
@@ -319,7 +428,7 @@ void TopBarComponent::resized()
     // ─── Row 2: Sliders ─────────────────────────────────────────────────
     auto row2 = bounds.reduced (0, 2);
 
-    int labelSpace = 28 + 34 + 26 + 24;
+    int labelSpace = 28 + 34 + 26 + 34;
     int gaps = 8 * 3;
     int sliderW = (row2.getWidth() - labelSpace - gaps) / 4;
 
@@ -335,7 +444,7 @@ void TopBarComponent::resized()
     velocitySensSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
     row2.removeFromLeft (8);
 
-    pitchBendLabel.setBounds (row2.removeFromLeft (24));
+    pitchBendLabel.setBounds (row2.removeFromLeft (34));
     pitchBendSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
 }
 

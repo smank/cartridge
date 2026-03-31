@@ -66,6 +66,13 @@ CartridgeProcessor::CartridgeProcessor()
     vrc6SawRateParam   = apvts.getRawParameterValue (cart::ParamIDs::Vrc6SawRate);
     vrc6SawMixParam    = apvts.getRawParameterValue (cart::ParamIDs::Vrc6SawMix);
 
+    p1TransposeParam     = apvts.getRawParameterValue (cart::ParamIDs::P1Transpose);
+    p2TransposeParam     = apvts.getRawParameterValue (cart::ParamIDs::P2Transpose);
+    triTransposeParam    = apvts.getRawParameterValue (cart::ParamIDs::TriTranspose);
+    vrc6P1TransposeParam = apvts.getRawParameterValue (cart::ParamIDs::Vrc6P1Transpose);
+    vrc6P2TransposeParam = apvts.getRawParameterValue (cart::ParamIDs::Vrc6P2Transpose);
+    vrc6SawTransposeParam = apvts.getRawParameterValue (cart::ParamIDs::Vrc6SawTranspose);
+
     velocitySensParam   = apvts.getRawParameterValue (cart::ParamIDs::VelocitySens);
     pitchBendRangeParam = apvts.getRawParameterValue (cart::ParamIDs::PitchBendRange);
     midiModeParam       = apvts.getRawParameterValue (cart::ParamIDs::MidiMode);
@@ -314,6 +321,17 @@ void CartridgeProcessor::updateDspFromParameters()
     voiceManager.setVrc6Available (vrc6On);
     if (regionChanged)
         voiceManager.setRegion (ntsc);
+
+    // Per-channel transpose
+    voiceManager.setTranspose (0, *p1TransposeParam);
+    voiceManager.setTranspose (1, *p2TransposeParam);
+    voiceManager.setTranspose (2, *triTransposeParam);
+    voiceManager.setTranspose (5, *vrc6P1TransposeParam);
+    voiceManager.setTranspose (6, *vrc6P2TransposeParam);
+    voiceManager.setTranspose (7, *vrc6SawTransposeParam);
+
+    // DPCM sample fallback for note mapping
+    voiceManager.setDpcmSample (static_cast<int> (cachedParams.dpcmSample));
 
     // Arpeggiator
     arpeggiator.setEnabled (*arpEnabledParam > 0.5f);

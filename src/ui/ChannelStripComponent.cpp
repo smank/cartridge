@@ -126,6 +126,14 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
     mainComboAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, prefix + "Duty", mainCombo);
 
+    // Transpose knob
+    hasTranspose = true;
+    styleKnob (transposeKnob);
+    transposeKnob.setTextValueSuffix (" st");
+    addAndMakeVisible (transposeKnob);
+    transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        apvts, prefix + "Transpose", transposeKnob);
+
     // Volume knob
     hasVolume = true;
     styleKnob (volumeKnob);
@@ -185,6 +193,14 @@ void ChannelStripComponent::setupTriangleControls (juce::AudioProcessorValueTree
     hasMainKnob = false;
     styleLabel (mainLabel, "32-Step", 11.0f, Colors::textSecondary);
     addAndMakeVisible (mainLabel);
+
+    // Transpose knob
+    hasTranspose = true;
+    styleKnob (transposeKnob);
+    transposeKnob.setTextValueSuffix (" st");
+    addAndMakeVisible (transposeKnob);
+    transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        apvts, ParamIDs::TriTranspose, transposeKnob);
 
     // No volume knob — fixed volume
     hasVolume = false;
@@ -310,6 +326,14 @@ void ChannelStripComponent::setupVrc6PulseControls (const juce::String& prefix,
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "Duty", mainKnob);
 
+    // Transpose knob
+    hasTranspose = true;
+    styleKnob (transposeKnob);
+    transposeKnob.setTextValueSuffix (" st");
+    addAndMakeVisible (transposeKnob);
+    transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        apvts, prefix + "Transpose", transposeKnob);
+
     // Volume knob
     hasVolume = true;
     styleKnob (volumeKnob);
@@ -336,6 +360,14 @@ void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeS
     addAndMakeVisible (mainKnob);
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::Vrc6SawRate, mainKnob);
+
+    // Transpose knob
+    hasTranspose = true;
+    styleKnob (transposeKnob);
+    transposeKnob.setTextValueSuffix (" st");
+    addAndMakeVisible (transposeKnob);
+    transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        apvts, ParamIDs::Vrc6SawTranspose, transposeKnob);
 
     // No volume — fixed
     hasVolume = false;
@@ -400,6 +432,13 @@ void ChannelStripComponent::resized()
         mainLabel.setBounds (mainArea);
     }
     area.removeFromTop (pad);
+
+    // Transpose knob (melodic channels only, 36px)
+    if (hasTranspose)
+    {
+        transposeKnob.setBounds (area.removeFromTop (36).reduced (2, 0));
+        area.removeFromTop (pad);
+    }
 
     // Volume knob (48px)
     auto volArea = area.removeFromTop (48);

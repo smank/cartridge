@@ -38,6 +38,8 @@ private:
     juce::TextButton prevButton { "<" };
     juce::TextButton nextButton { ">" };
     juce::TextButton saveButton { "Save" };
+    juce::TextButton importButton { "Import" };
+    juce::TextButton exportButton { "Export" };
     juce::TextButton panicButton { "Panic" };
 
     // Global controls
@@ -72,6 +74,7 @@ private:
 
     void populatePresets();
     void selectPreset (int index);
+    void refreshUserCategories();
 
     bool lastVrc6State = false;
 
