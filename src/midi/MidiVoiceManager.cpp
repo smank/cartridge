@@ -161,12 +161,13 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
     }
     else if (mode == MidiMode::Auto)
     {
-        // Auto poly: round-robin across ALL enabled channels
-        static constexpr int allSlots[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        // Auto poly: round-robin across melodic channels only
+        // Skip Noise (3) and DPCM (4) — those are percussion-only via Split mode
+        static constexpr int melodicSlots[] = { 0, 1, 2, 5, 6, 7 };
 
         int candidates[8];
         int numCandidates = 0;
-        for (int s : allSlots)
+        for (int s : melodicSlots)
         {
             if (! channelEnabled[s]) continue;
             if (s >= 5 && ! vrc6Available) continue;
