@@ -5,6 +5,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
       processorRef (p),
       topBar (p, p.getApvts()),
       channelStrips (p.getApvts()),
+      modernPanel (p.getApvts()),
       effectsBar (p.getApvts()),
       modulationBar (p.getApvts()),
       statusBar (p),
@@ -21,6 +22,15 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     {
         effectsBar.collapseAll();
         modulationBar.collapseAll();
+    };
+
+    // Wire up engine mode toggle
+    topBar.onEngineToggle = [this] (bool modern)
+    {
+        modernModeActive = modern;
+        channelStrips.setVisible (!modern);
+        modernPanel.setVisible (modern);
+        resized();
     };
 
     // Wire up UI scaling from top bar
@@ -55,6 +65,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
     addAndMakeVisible (topBar);
     addAndMakeVisible (channelStrips);
+    addChildComponent (modernPanel);  // Hidden by default (Classic mode)
     addAndMakeVisible (effectsBar);
     addAndMakeVisible (modulationBar);
     addAndMakeVisible (statusBar);
@@ -64,6 +75,15 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     auto* vrc6Param = p.getApvts().getRawParameterValue (cart::ParamIDs::Vrc6Enabled);
     if (vrc6Param != nullptr)
         channelStrips.setVrc6Visible (vrc6Param->load() >= 0.5f);
+
+    // Sync initial engine mode
+    auto* engineModeParam = p.getApvts().getRawParameterValue (cart::ParamIDs::EngineMode);
+    if (engineModeParam != nullptr)
+    {
+        modernModeActive = (static_cast<int> (engineModeParam->load()) == 1);
+        channelStrips.setVisible (!modernModeActive);
+        modernPanel.setVisible (modernModeActive);
+    }
 
     // Load saved scale (just the value, don't resize yet)
     loadScalePreference();
@@ -184,7 +204,19 @@ void CartridgeEditor::resized()
     statusBar.setBounds (area.removeFromBottom (statusBarHeight));
     effectsBar.setBounds (area.removeFromBottom (effectsBar.getDesiredHeight()));
     modulationBar.setBounds (area.removeFromBottom (modulationBar.getDesiredHeight()));
-    channelStrips.setBounds (area);
+
+    if (modernModeActive)
+    {
+        modernPanel.setBounds (area);
+        channelStrips.setVisible (false);
+        modernPanel.setVisible (true);
+    }
+    else
+    {
+        channelStrips.setBounds (area);
+        channelStrips.setVisible (true);
+        modernPanel.setVisible (false);
+    }
 }
 
 bool CartridgeEditor::keyPressed (const juce::KeyPress& key)

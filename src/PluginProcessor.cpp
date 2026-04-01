@@ -91,6 +91,28 @@ CartridgeProcessor::CartridgeProcessor()
     lfoVibratoDepthParam   = apvts.getRawParameterValue (cart::ParamIDs::LfoVibratoDepth);
     lfoTremoloDepthParam   = apvts.getRawParameterValue (cart::ParamIDs::LfoTremoloDepth);
 
+    // Modern engine params
+    engineModeParam      = apvts.getRawParameterValue (cart::ParamIDs::EngineMode);
+    modWaveformParam     = apvts.getRawParameterValue (cart::ParamIDs::ModWaveform);
+    modVoicesParam       = apvts.getRawParameterValue (cart::ParamIDs::ModVoices);
+    modAttackParam       = apvts.getRawParameterValue (cart::ParamIDs::ModAttack);
+    modDecayParam        = apvts.getRawParameterValue (cart::ParamIDs::ModDecay);
+    modSustainParam      = apvts.getRawParameterValue (cart::ParamIDs::ModSustain);
+    modReleaseParam      = apvts.getRawParameterValue (cart::ParamIDs::ModRelease);
+    modUnisonParam       = apvts.getRawParameterValue (cart::ParamIDs::ModUnison);
+    modDetuneParam       = apvts.getRawParameterValue (cart::ParamIDs::ModDetune);
+    modPortaEnabledParam = apvts.getRawParameterValue (cart::ParamIDs::ModPortaEnabled);
+    modPortaTimeParam    = apvts.getRawParameterValue (cart::ParamIDs::ModPortaTime);
+    modVelToFilterParam  = apvts.getRawParameterValue (cart::ParamIDs::ModVelToFilter);
+    modVolumeParam       = apvts.getRawParameterValue (cart::ParamIDs::ModVolume);
+    modOscAEnabledParam  = apvts.getRawParameterValue (cart::ParamIDs::ModOscAEnabled);
+    modOscBEnabledParam  = apvts.getRawParameterValue (cart::ParamIDs::ModOscBEnabled);
+    modWaveformBParam    = apvts.getRawParameterValue (cart::ParamIDs::ModWaveformB);
+    modOscBLevelParam    = apvts.getRawParameterValue (cart::ParamIDs::ModOscBLevel);
+    modOscBDetuneParam   = apvts.getRawParameterValue (cart::ParamIDs::ModOscBDetune);
+
+    modernVoiceManager.setEngine (&modernEngine);
+
     // MIDI CC → parameter mappings
     voiceManager.onControlChange = [this] (int cc, float value01)
     {
@@ -156,6 +178,8 @@ void CartridgeProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     apu.setSampleRate (sampleRate);
     apu.reset();
+    modernEngine.setSampleRate (sampleRate);
+    modernEngine.reset();
     effectsChain.prepare (sampleRate, samplesPerBlock);
     arpeggiator.setSampleRate (sampleRate);
     voiceManager.setSampleRateForPorta (sampleRate);
@@ -333,6 +357,28 @@ void CartridgeProcessor::updateDspFromParameters()
     // DPCM sample fallback for note mapping
     voiceManager.setDpcmSample (static_cast<int> (cachedParams.dpcmSample));
 
+    // Engine mode
+    bool modernMode = (static_cast<int> (*engineModeParam) == 1);
+    usingModernEngine = modernMode;
+    if (modernMode)
+    {
+        modernEngine.setWaveform (static_cast<cart::NesWaveform> (static_cast<int> (*modWaveformParam)));
+        modernEngine.setWaveformB (static_cast<cart::NesWaveform> (static_cast<int> (*modWaveformBParam)));
+        modernEngine.setOscAEnabled (*modOscAEnabledParam > 0.5f);
+        modernEngine.setOscBEnabled (*modOscBEnabledParam > 0.5f);
+        modernEngine.setOscBLevel (*modOscBLevelParam);
+        modernEngine.setOscBDetune (*modOscBDetuneParam);
+        modernEngine.setMaxVoices (static_cast<int> (*modVoicesParam));
+        modernEngine.setAdsr (*modAttackParam, *modDecayParam, *modSustainParam, *modReleaseParam);
+        modernEngine.setUnisonCount (static_cast<int> (*modUnisonParam));
+        modernEngine.setUnisonDetune (*modDetuneParam);
+        modernEngine.setPortamento (*modPortaEnabledParam > 0.5f, *modPortaTimeParam);
+        modernEngine.setMasterVolume (*modVolumeParam);
+        modernVoiceManager.setVelocitySensitivity (*velocitySensParam);
+        modernVoiceManager.setPitchBendRange (static_cast<int> (*pitchBendRangeParam));
+        modernVoiceManager.setMasterTune (*masterTuneParam);
+    }
+
     // Arpeggiator
     arpeggiator.setEnabled (*arpEnabledParam > 0.5f);
     arpeggiator.setPattern (static_cast<cart::ArpPattern> (static_cast<int> (*arpPatternParam)));
@@ -373,7 +419,9 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         effectsChain.reset();
         apu.reset();
+        modernEngine.reset();
         voiceManager.handleAllNotesOff();
+        modernVoiceManager.handleAllNotesOff();
         arpeggiator.reset();
         lastArpNote = -1;
         lfo.reset();
@@ -394,6 +442,7 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (wasHolding && !hold)
     {
         voiceManager.handleAllNotesOff();
+        modernVoiceManager.handleAllNotesOff();
         arpeggiator.reset();
         lastArpNote = -1;
     }
@@ -403,10 +452,20 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (wasSustaining && !sustain && !hold)
     {
         voiceManager.handleAllNotesOff();
+        modernVoiceManager.handleAllNotesOff();
         arpeggiator.reset();
         lastArpNote = -1;
     }
     wasSustaining = sustain;
+
+    // Select which voice manager receives MIDI
+    auto dispatchMidi = [&] (const juce::MidiMessage& msg)
+    {
+        if (usingModernEngine)
+            modernVoiceManager.processMidiMessage (msg);
+        else
+            voiceManager.processMidiMessage (msg);
+    };
 
     // Process MIDI and audio sample-by-sample
     auto midiIterator = midiMessages.cbegin();
@@ -447,11 +506,11 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 else if (msg.isNoteOff())
                     arpeggiator.noteOff (msg.getNoteNumber());
                 else
-                    voiceManager.processMidiMessage (msg); // pitch bend etc pass through
+                    dispatchMidi (msg); // pitch bend etc pass through
             }
             else if (! suppressNoteOff)
             {
-                voiceManager.processMidiMessage (msg);
+                dispatchMidi (msg);
             }
 
             ++midiIterator;
@@ -466,16 +525,16 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             if (arpEvent == cart::ArpEvent::NoteOn)
             {
                 if (lastArpNote >= 0)
-                    voiceManager.processMidiMessage (juce::MidiMessage::noteOff (1, lastArpNote, (juce::uint8) 0));
+                    dispatchMidi (juce::MidiMessage::noteOff (1, lastArpNote, (juce::uint8) 0));
 
-                voiceManager.processMidiMessage (juce::MidiMessage::noteOn (1, arpNote, arpeggiator.getLastVelocity()));
+                dispatchMidi (juce::MidiMessage::noteOn (1, arpNote, arpeggiator.getLastVelocity()));
                 lastArpNote = arpNote;
             }
             else if (arpEvent == cart::ArpEvent::GateOff)
             {
                 if (lastArpNote >= 0)
                 {
-                    voiceManager.processMidiMessage (juce::MidiMessage::noteOff (1, lastArpNote, (juce::uint8) 0));
+                    dispatchMidi (juce::MidiMessage::noteOff (1, lastArpNote, (juce::uint8) 0));
                     lastArpNote = -1;
                 }
             }
@@ -483,23 +542,35 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         else if (lastArpNote >= 0)
         {
             // Arp was just disabled — clean up last note
-            voiceManager.processMidiMessage (juce::MidiMessage::noteOff (1, lastArpNote, (juce::uint8) 0));
+            dispatchMidi (juce::MidiMessage::noteOff (1, lastArpNote, (juce::uint8) 0));
             lastArpNote = -1;
         }
-
-        // Portamento glide tick
-        voiceManager.tickPortamento();
 
         // LFO modulation
         lfo.tick();
         float pitchMult = lfo.getPitchMultiplier();
-        if (pitchMult != 1.0f)
-            voiceManager.applyPitchMultiplier (pitchMult);
 
-        // Generate one sample from the APU — write to ch0 only
-        float out = apu.process() * lfo.getVolumeMultiplier();
+        float out;
+        if (usingModernEngine)
+        {
+            // Modern engine path
+            if (pitchMult != 1.0f)
+                modernVoiceManager.applyPitchMultiplier (pitchMult);
 
-        // DC blocking filter: removes NES DAC offset (~0.5–0.9 at silence)
+            out = modernEngine.process() * lfo.getVolumeMultiplier();
+        }
+        else
+        {
+            // Classic engine path
+            voiceManager.tickPortamento();
+
+            if (pitchMult != 1.0f)
+                voiceManager.applyPitchMultiplier (pitchMult);
+
+            out = apu.process() * lfo.getVolumeMultiplier();
+        }
+
+        // DC blocking filter: removes offset
         // y[n] = x[n] - x[n-1] + R * y[n-1], R=0.995 ≈ 16 Hz cutoff at 44.1kHz
         float dcOut = out - dcBlockX + 0.995f * dcBlockY;
         dcBlockX = out;

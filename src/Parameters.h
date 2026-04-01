@@ -81,6 +81,28 @@ namespace ParamIDs {
     inline constexpr const char* PitchBendRange   = "pitchBendRange";
     inline constexpr const char* MidiMode         = "midiMode";
 
+    // Engine Mode
+    inline constexpr const char* EngineMode       = "engineMode";
+
+    // Modern Engine
+    inline constexpr const char* ModWaveform      = "modWaveform";
+    inline constexpr const char* ModVoices        = "modVoices";
+    inline constexpr const char* ModAttack        = "modAttack";
+    inline constexpr const char* ModDecay         = "modDecay";
+    inline constexpr const char* ModSustain       = "modSustain";
+    inline constexpr const char* ModRelease       = "modRelease";
+    inline constexpr const char* ModUnison        = "modUnison";
+    inline constexpr const char* ModDetune        = "modDetune";
+    inline constexpr const char* ModPortaEnabled  = "modPortaEnabled";
+    inline constexpr const char* ModPortaTime     = "modPortaTime";
+    inline constexpr const char* ModVelToFilter   = "modVelToFilter";
+    inline constexpr const char* ModVolume        = "modVolume";
+    inline constexpr const char* ModOscAEnabled   = "modOscAEnabled";
+    inline constexpr const char* ModOscBEnabled   = "modOscBEnabled";
+    inline constexpr const char* ModWaveformB     = "modWaveformB";
+    inline constexpr const char* ModOscBLevel     = "modOscBLevel";
+    inline constexpr const char* ModOscBDetune    = "modOscBDetune";
+
     // Portamento
     inline constexpr const char* PortaEnabled     = "portaEnabled";
     inline constexpr const char* PortaTime        = "portaTime";

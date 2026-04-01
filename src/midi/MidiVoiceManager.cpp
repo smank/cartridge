@@ -161,7 +161,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
     }
     else if (mode == MidiMode::Auto)
     {
-        // Auto poly: round-robin across melodic channels only
+        // Auto poly: smart allocation across melodic channels only
         // Skip Noise (3) and DPCM (4) — those are percussion-only via Split mode
         static constexpr int melodicSlots[] = { 0, 1, 2, 5, 6, 7 };
 
@@ -177,27 +177,48 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
         if (numCandidates == 0)
             return;
 
-        // Prefer a free channel, starting from round-robin position
+        // 1. Retrigger reuse: if note already playing on a channel, reuse it
         int chosen = -1;
         for (int i = 0; i < numCandidates; ++i)
         {
-            int idx = (nextAutoChannel + i) % numCandidates;
-            if (activeNotes[candidates[idx]] < 0)
+            if (activeNotes[candidates[i]] == note)
             {
-                chosen = idx;
+                chosen = i;
                 break;
             }
         }
 
-        // All channels busy — steal the round-robin slot
+        // 2. Find a free channel
         if (chosen < 0)
         {
-            chosen = nextAutoChannel % numCandidates;
+            for (int i = 0; i < numCandidates; ++i)
+            {
+                if (activeNotes[candidates[i]] < 0)
+                {
+                    chosen = i;
+                    break;
+                }
+            }
+        }
+
+        // 3. All channels busy — steal the oldest note
+        if (chosen < 0)
+        {
+            uint32_t oldestAge = UINT32_MAX;
+            int oldestIdx = 0;
+            for (int i = 0; i < numCandidates; ++i)
+            {
+                if (noteAge[candidates[i]] < oldestAge)
+                {
+                    oldestAge = noteAge[candidates[i]];
+                    oldestIdx = i;
+                }
+            }
+            chosen = oldestIdx;
             noteOffChannel (candidates[chosen]);
         }
 
         noteOnChannel (candidates[chosen], note, vol, bendSemitones);
-        nextAutoChannel = (chosen + 1) % numCandidates;
     }
 }
 
@@ -483,6 +504,7 @@ void MidiVoiceManager::noteOnChannel (int ch, int note, float vol, float bendSem
         default: break;
     }
     activeNotes[ch] = note;
+    noteAge[ch] = ++noteAgeCounter;
 }
 
 void MidiVoiceManager::noteOffChannel (int ch)

@@ -217,6 +217,16 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     pitchBendLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
     addAndMakeVisible (pitchBendLabel);
 
+    // ─── Engine Mode ────────────────────────────────────────────────────
+    engineModeCombo.addItem ("Classic", 1);
+    engineModeCombo.addItem ("Modern", 2);
+    engineModeCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
+    engineModeCombo.setColour (juce::ComboBox::textColourId, Colors::fxBright);
+    engineModeCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    addAndMakeVisible (engineModeCombo);
+    engineModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
+        apvts, ParamIDs::EngineMode, engineModeCombo);
+
     // ─── VRC6 Toggle ─────────────────────────────────────────────────────
     vrc6Toggle.setButtonText ("VRC6");
     vrc6Toggle.setColour (juce::ToggleButton::textColourId, Colors::orangeAccent);
@@ -251,7 +261,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── MIDI Info Button ────────────────────────────────────────────────
     midiInfoButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
     midiInfoButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
-    midiInfoButton.onClick = [this]
+    midiInfoButton.onClick = []
     {
         auto* popup = new juce::AlertWindow ("MIDI CC Mappings", "", juce::MessageBoxIconType::NoIcon);
         popup->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
@@ -371,6 +381,15 @@ void TopBarComponent::timerCallback()
         if (onVrc6Toggle)
             onVrc6Toggle (vrc6On);
     }
+
+    // Engine mode change
+    int engineMode = engineModeCombo.getSelectedId();
+    if (engineMode != lastEngineMode)
+    {
+        lastEngineMode = engineMode;
+        if (onEngineToggle)
+            onEngineToggle (engineMode == 2);  // 2 = Modern
+    }
 }
 
 void TopBarComponent::mouseDoubleClick (const juce::MouseEvent&)
@@ -416,6 +435,8 @@ void TopBarComponent::resized()
 
     // Right side
     vrc6Toggle.setBounds (row1.removeFromRight (60));
+    row1.removeFromRight (4);
+    engineModeCombo.setBounds (row1.removeFromRight (75));
     row1.removeFromRight (4);
     scaleCombo.setBounds (row1.removeFromRight (65));
     row1.removeFromRight (4);

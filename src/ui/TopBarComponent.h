@@ -26,6 +26,7 @@ public:
     std::function<void (bool)> onVrc6Toggle;
     std::function<void()> onPresetChanged;
     std::function<void (float)> onScaleChanged;
+    std::function<void (bool)> onEngineToggle;   // true = Modern
 
     void navigatePreset (int delta);
     void setScaleIndex (int comboId) { scaleCombo.setSelectedId (comboId, juce::dontSendNotification); }
@@ -65,6 +66,10 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> pitchBendAttach;
     juce::Label pitchBendLabel;
 
+    // Engine Mode
+    juce::ComboBox engineModeCombo;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> engineModeAttach;
+
     // VRC6 toggle
     juce::ToggleButton vrc6Toggle;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> vrc6Attach;
@@ -77,6 +82,7 @@ private:
     void refreshUserCategories();
 
     bool lastVrc6State = false;
+    int  lastEngineMode = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TopBarComponent)
 };

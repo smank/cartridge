@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 if(APPLE)
-    project(Cartridge VERSION 1.4.0 LANGUAGES C CXX OBJC OBJCXX)
+    project(Cartridge VERSION 1.5.0 LANGUAGES C CXX OBJC OBJCXX)
 else()
-    project(Cartridge VERSION 1.4.0 LANGUAGES C CXX)
+    project(Cartridge VERSION 1.5.0 LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -59,6 +59,8 @@ target_sources(Cartridge
         src/dsp/DpcmSamples.cpp
         src/dsp/channels/Vrc6PulseChannel.cpp
         src/dsp/channels/Vrc6SawChannel.cpp
+        src/dsp/modern/ModernVoice.cpp
+        src/dsp/modern/ModernEngine.cpp
         src/dsp/mixing/ApuMixer.cpp
         src/dsp/effects/BitCrush.cpp
         src/dsp/effects/Filter.cpp
@@ -68,8 +70,10 @@ target_sources(Cartridge
         src/dsp/effects/EffectsChain.cpp
         src/ui/EffectsBarComponent.cpp
         src/ui/ModulationBarComponent.cpp
+        src/ui/ModernPanelComponent.cpp
         src/ui/StatusBarComponent.cpp
         src/midi/MidiVoiceManager.cpp
+        src/midi/ModernVoiceManager.cpp
         src/midi/Arpeggiator.cpp
         src/ui/FullscreenHelper.cpp
 )

@@ -198,6 +198,87 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
         juce::StringArray { "Split", "Auto", "Mono" },
         1));
 
+    // ─── Engine Mode ──────────────────────────────────────────────────
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamIDs::EngineMode, 1 },
+        "Engine Mode",
+        juce::StringArray { "Classic", "Modern" },
+        0));
+
+    // ─── Modern Engine ─────────────────────────────────────────────────
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamIDs::ModWaveform, 1 },
+        "Mod Waveform",
+        juce::StringArray { "Pulse 25%", "Pulse 50%", "Pulse 75%", "Pulse 12.5%", "Triangle", "Sawtooth", "Noise" },
+        1));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::ModVoices, 1 }, "Mod Voices", 1, 16, 8));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModAttack, 1 }, "Mod Attack",
+        juce::NormalisableRange<float> (0.001f, 4.0f, 0.001f, 0.35f), 0.005f,
+        juce::AudioParameterFloatAttributes().withLabel ("s")));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModDecay, 1 }, "Mod Decay",
+        juce::NormalisableRange<float> (0.001f, 4.0f, 0.001f, 0.35f), 0.1f,
+        juce::AudioParameterFloatAttributes().withLabel ("s")));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModSustain, 1 }, "Mod Sustain",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 1.0f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModRelease, 1 }, "Mod Release",
+        juce::NormalisableRange<float> (0.001f, 4.0f, 0.001f, 0.35f), 0.1f,
+        juce::AudioParameterFloatAttributes().withLabel ("s")));
+
+    params.push_back (std::make_unique<juce::AudioParameterInt> (
+        juce::ParameterID { ParamIDs::ModUnison, 1 }, "Mod Unison", 1, 7, 1));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModDetune, 1 }, "Mod Detune",
+        juce::NormalisableRange<float> (0.0f, 50.0f, 0.1f), 0.0f,
+        juce::AudioParameterFloatAttributes().withLabel ("cents")));
+
+    params.push_back (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamIDs::ModPortaEnabled, 1 }, "Mod Portamento", false));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModPortaTime, 1 }, "Mod Portamento Time",
+        juce::NormalisableRange<float> (0.01f, 2.0f, 0.01f, 0.4f), 0.1f,
+        juce::AudioParameterFloatAttributes().withLabel ("s")));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModVelToFilter, 1 }, "Mod Vel→Filter",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.0f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModVolume, 1 }, "Mod Volume",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.8f));
+
+    params.push_back (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamIDs::ModOscAEnabled, 1 }, "Mod Osc A Enabled", true));
+
+    params.push_back (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamIDs::ModOscBEnabled, 1 }, "Mod Osc B Enabled", false));
+
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamIDs::ModWaveformB, 1 },
+        "Mod Waveform B",
+        juce::StringArray { "Pulse 25%", "Pulse 50%", "Pulse 75%", "Pulse 12.5%", "Triangle", "Sawtooth", "Noise" },
+        1));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModOscBLevel, 1 }, "Mod Osc B Level",
+        juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.8f));
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (
+        juce::ParameterID { ParamIDs::ModOscBDetune, 1 }, "Mod Osc B Detune",
+        juce::NormalisableRange<float> (-24.0f, 24.0f, 0.1f), 0.0f,
+        juce::AudioParameterFloatAttributes().withLabel ("semi")));
+
     // ─── Portamento ─────────────────────────────────────────────────────
     params.push_back (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamIDs::PortaEnabled, 1 }, "Portamento Enabled", false));

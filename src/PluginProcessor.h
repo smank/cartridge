@@ -6,8 +6,10 @@
 #include "dsp/Apu.h"
 #include "dsp/effects/EffectsChain.h"
 #include "midi/MidiVoiceManager.h"
+#include "midi/ModernVoiceManager.h"
 #include "midi/Arpeggiator.h"
 #include "dsp/Lfo.h"
+#include "dsp/modern/ModernEngine.h"
 
 class CartridgeProcessor : public juce::AudioProcessor
 {
@@ -55,11 +57,14 @@ private:
     cart::PresetManager                 presetManager;
     int                                currentPreset = 0;
 
-    cart::Apu           apu;
+    cart::Apu              apu;
     cart::MidiVoiceManager voiceManager;
+    cart::ModernEngine     modernEngine;
+    cart::ModernVoiceManager modernVoiceManager;
     cart::EffectsChain     effectsChain;
     cart::Arpeggiator      arpeggiator;
     cart::Lfo              lfo;
+    bool                   usingModernEngine = false;
     int                    lastArpNote = -1;
     int                    fadeInSamplesRemaining = 0;
     std::atomic<bool>      holdMode { false };
@@ -152,6 +157,26 @@ private:
     std::atomic<float>* lfoRateParam           = nullptr;
     std::atomic<float>* lfoVibratoDepthParam   = nullptr;
     std::atomic<float>* lfoTremoloDepthParam   = nullptr;
+
+    // Modern engine params
+    std::atomic<float>* engineModeParam      = nullptr;
+    std::atomic<float>* modWaveformParam     = nullptr;
+    std::atomic<float>* modVoicesParam       = nullptr;
+    std::atomic<float>* modAttackParam       = nullptr;
+    std::atomic<float>* modDecayParam        = nullptr;
+    std::atomic<float>* modSustainParam      = nullptr;
+    std::atomic<float>* modReleaseParam      = nullptr;
+    std::atomic<float>* modUnisonParam       = nullptr;
+    std::atomic<float>* modDetuneParam       = nullptr;
+    std::atomic<float>* modPortaEnabledParam = nullptr;
+    std::atomic<float>* modPortaTimeParam    = nullptr;
+    std::atomic<float>* modVelToFilterParam  = nullptr;
+    std::atomic<float>* modVolumeParam       = nullptr;
+    std::atomic<float>* modOscAEnabledParam  = nullptr;
+    std::atomic<float>* modOscBEnabledParam  = nullptr;
+    std::atomic<float>* modWaveformBParam    = nullptr;
+    std::atomic<float>* modOscBLevelParam    = nullptr;
+    std::atomic<float>* modOscBDetuneParam   = nullptr;
 
     // Cached previous values for change detection
     struct CachedParams

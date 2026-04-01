@@ -90,7 +90,8 @@ private:
     // Channels: 0=P1, 1=P2, 2=Tri, 3=Noise, 4=DPCM, 5=VRC6P1, 6=VRC6P2, 7=VRC6Saw
     int       activeNotes[8]      = { -1, -1, -1, -1, -1, -1, -1, -1 };
     bool      channelEnabled[8]   = { true, false, false, false, false, false, false, false };
-    int       nextAutoChannel     = 0;    // Round-robin index for Auto poly
+    uint32_t  noteAge[8]          = {};   // Monotonic counter for oldest-note stealing
+    uint32_t  noteAgeCounter      = 0;    // Global age counter
 
     void noteOnChannel (int nesChannel, int note, float vol, float bendSemitones);
     void noteOffChannel (int nesChannel);

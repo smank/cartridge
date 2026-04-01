@@ -7,6 +7,7 @@
 #include "ui/EffectsBarComponent.h"
 #include "ui/ModulationBarComponent.h"
 #include "ui/StatusBarComponent.h"
+#include "ui/ModernPanelComponent.h"
 #include "ui/Colors.h"
 #include "ui/FullscreenHelper.h"
 
@@ -26,10 +27,13 @@ private:
 
     cart::TopBarComponent topBar;
     cart::ChannelStripArea channelStrips;
+    cart::ModernPanelComponent modernPanel;
     cart::EffectsBarComponent effectsBar;
     cart::ModulationBarComponent modulationBar;
     cart::StatusBarComponent statusBar;
     juce::MidiKeyboardComponent keyboard;
+
+    bool modernModeActive = false;
 
     int currentOctaveOffset = 0;
     float currentVelocity = 0.8f;

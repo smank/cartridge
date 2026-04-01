@@ -172,6 +172,28 @@ PresetManager::PresetManager()
         { ParamIDs::Vrc6P2Transpose,  0.0f },
         { ParamIDs::Vrc6SawTranspose, 0.0f },
 
+        // Engine Mode
+        { ParamIDs::EngineMode,       0.0f },  // Classic (default)
+
+        // Modern Engine
+        { ParamIDs::ModWaveform,      1.0f },  // Pulse 50%
+        { ParamIDs::ModVoices,        8.0f },
+        { ParamIDs::ModAttack,        0.005f },
+        { ParamIDs::ModDecay,         0.1f },
+        { ParamIDs::ModSustain,       1.0f },
+        { ParamIDs::ModRelease,       0.1f },
+        { ParamIDs::ModUnison,        1.0f },
+        { ParamIDs::ModDetune,        0.0f },
+        { ParamIDs::ModPortaEnabled,  0.0f },
+        { ParamIDs::ModPortaTime,     0.1f },
+        { ParamIDs::ModVelToFilter,   0.0f },
+        { ParamIDs::ModVolume,        0.8f },
+        { ParamIDs::ModOscAEnabled,   1.0f },
+        { ParamIDs::ModOscBEnabled,   0.0f },
+        { ParamIDs::ModWaveformB,     1.0f },  // Pulse 50%
+        { ParamIDs::ModOscBLevel,     0.8f },
+        { ParamIDs::ModOscBDetune,    0.0f },
+
         // Modern
         { ParamIDs::VelocitySens,     0.0f },
         { ParamIDs::PitchBendRange,   2.0f },
@@ -717,6 +739,106 @@ void PresetManager::buildPresets()
         { ParamIDs::RvDamping,        0.2f },
         { ParamIDs::RvWidth,          1.0f },
         { ParamIDs::RvMix,            0.45f },
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  MODERN ENGINE (31–35)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 31. Modern Pulse Pad — Pulse 50% + Triangle octave layer + chorus
+    presets.push_back (makePreset ("Modern Pulse Pad", {
+        { ParamIDs::EngineMode,       1.0f },   // Modern
+        { ParamIDs::ModWaveform,      1.0f },   // Pulse 50% (Osc A)
+        { ParamIDs::ModOscBEnabled,   1.0f },   // Enable Osc B
+        { ParamIDs::ModWaveformB,     4.0f },   // Triangle (Osc B)
+        { ParamIDs::ModOscBLevel,     0.5f },
+        { ParamIDs::ModOscBDetune,    12.0f },  // Octave up
+        { ParamIDs::ModVoices,        8.0f },
+        { ParamIDs::ModAttack,        0.05f },
+        { ParamIDs::ModDecay,         0.3f },
+        { ParamIDs::ModSustain,       0.7f },
+        { ParamIDs::ModRelease,       0.8f },
+        { ParamIDs::ModUnison,        3.0f },
+        { ParamIDs::ModDetune,        12.0f },
+        { ParamIDs::ModVolume,        0.8f },
+        { ParamIDs::VelocitySens,     0.4f },
+        { ParamIDs::ChEnabled,        1.0f },
+        { ParamIDs::ChRate,           0.4f },
+        { ParamIDs::ChDepth,          0.2f },
+        { ParamIDs::ChMix,            0.3f },
+    }));
+
+    // 32. NES Poly Lead — Punchy polyphonic 25% pulse
+    presets.push_back (makePreset ("NES Poly Lead", {
+        { ParamIDs::EngineMode,       1.0f },   // Modern
+        { ParamIDs::ModWaveform,      0.0f },   // Pulse 25%
+        { ParamIDs::ModVoices,        6.0f },
+        { ParamIDs::ModAttack,        0.002f },
+        { ParamIDs::ModDecay,         0.15f },
+        { ParamIDs::ModSustain,       0.8f },
+        { ParamIDs::ModRelease,       0.15f },
+        { ParamIDs::ModVolume,        0.85f },
+        { ParamIDs::VelocitySens,     0.5f },
+    }));
+
+    // 33. Thick Saw Unison — Saw + Pulse 50% layered, full unison spread
+    presets.push_back (makePreset ("Thick Saw Unison", {
+        { ParamIDs::EngineMode,       1.0f },   // Modern
+        { ParamIDs::ModWaveform,      5.0f },   // Sawtooth (Osc A)
+        { ParamIDs::ModOscBEnabled,   1.0f },   // Enable Osc B
+        { ParamIDs::ModWaveformB,     1.0f },   // Pulse 50% (Osc B)
+        { ParamIDs::ModOscBLevel,     0.6f },
+        { ParamIDs::ModOscBDetune,    0.0f },
+        { ParamIDs::ModVoices,        8.0f },
+        { ParamIDs::ModAttack,        0.01f },
+        { ParamIDs::ModDecay,         0.2f },
+        { ParamIDs::ModSustain,       0.9f },
+        { ParamIDs::ModRelease,       0.3f },
+        { ParamIDs::ModUnison,        5.0f },
+        { ParamIDs::ModDetune,        20.0f },
+        { ParamIDs::ModVolume,        0.7f },
+        { ParamIDs::VelocitySens,     0.3f },
+        { ParamIDs::RvEnabled,        1.0f },
+        { ParamIDs::RvSize,           0.3f },
+        { ParamIDs::RvMix,            0.15f },
+    }));
+
+    // 34. Triangle Bells — Poly triangle with fast decay for bell-like tones
+    presets.push_back (makePreset ("Triangle Bells", {
+        { ParamIDs::EngineMode,       1.0f },   // Modern
+        { ParamIDs::ModWaveform,      4.0f },   // Triangle
+        { ParamIDs::ModVoices,        12.0f },
+        { ParamIDs::ModAttack,        0.001f },
+        { ParamIDs::ModDecay,         0.5f },
+        { ParamIDs::ModSustain,       0.0f },
+        { ParamIDs::ModRelease,       0.4f },
+        { ParamIDs::ModVolume,        0.85f },
+        { ParamIDs::DlEnabled,        1.0f },
+        { ParamIDs::DlTime,           400.0f },
+        { ParamIDs::DlFeedback,       0.4f },
+        { ParamIDs::DlMix,            0.25f },
+        { ParamIDs::RvEnabled,        1.0f },
+        { ParamIDs::RvSize,           0.6f },
+        { ParamIDs::RvMix,            0.3f },
+    }));
+
+    // 35. Noise Texture — Polyphonic noise with long attack for ambient
+    presets.push_back (makePreset ("Noise Texture", {
+        { ParamIDs::EngineMode,       1.0f },   // Modern
+        { ParamIDs::ModWaveform,      6.0f },   // Noise
+        { ParamIDs::ModVoices,        4.0f },
+        { ParamIDs::ModAttack,        0.3f },
+        { ParamIDs::ModDecay,         0.5f },
+        { ParamIDs::ModSustain,       0.5f },
+        { ParamIDs::ModRelease,       1.0f },
+        { ParamIDs::ModVolume,        0.6f },
+        { ParamIDs::FltEnabled,       1.0f },
+        { ParamIDs::FltType,          0.0f },   // LP
+        { ParamIDs::FltCutoff,        2000.0f },
+        { ParamIDs::FltResonance,     1.0f },
+        { ParamIDs::RvEnabled,        1.0f },
+        { ParamIDs::RvSize,           0.8f },
+        { ParamIDs::RvMix,            0.4f },
     }));
 
     // 30. Surface Tension — Overworld action theme
