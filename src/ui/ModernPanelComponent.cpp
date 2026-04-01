@@ -149,56 +149,133 @@ void ModernPanelComponent::makeLabel (juce::Label& label, const juce::String& te
 
 void ModernPanelComponent::paint (juce::Graphics& g)
 {
-    g.setColour (Colors::bgMid);
+    // Dark chassis background (visible between section panels)
+    g.setColour (Colors::bgDark);
     g.fillRect (getLocalBounds());
 
-    // Section headers
-    g.setColour (Colors::textSecondary);
-    g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+    auto bounds = getLocalBounds().reduced (10, 8);
+    const int sectionGap = 8;
+    const int sectionH = (bounds.getHeight() - 2 * sectionGap) / 3;
+    const float cornerR = 6.0f;
+    const int accentH = 3;
+    const int headerH = 18;
+    const juce::String sectionNames[] = { "OSCILLATORS", "ENVELOPE", "GLOBAL" };
 
-    auto bounds = getLocalBounds().reduced (12, 8);
-    int rowH = bounds.getHeight() / 3;
+    for (int i = 0; i < 3; ++i)
+    {
+        auto sectionBounds = juce::Rectangle<float> (
+            (float) bounds.getX(),
+            (float) (bounds.getY() + i * (sectionH + sectionGap)),
+            (float) bounds.getWidth(),
+            (float) sectionH);
 
-    // Row headers
-    auto headerArea = bounds;
-    g.drawText ("OSC A", headerArea.removeFromTop (16).toFloat(), juce::Justification::centredLeft);
-    headerArea.removeFromTop (rowH - 16);
-    g.drawText ("ENVELOPE", headerArea.removeFromTop (16).toFloat(), juce::Justification::centredLeft);
-    headerArea.removeFromTop (rowH - 16);
-    g.drawText ("GLOBAL", headerArea.removeFromTop (16).toFloat(), juce::Justification::centredLeft);
+        // Section panel background
+        g.setColour (Colors::bgStrip);
+        g.fillRoundedRectangle (sectionBounds, cornerR);
 
-    // Draw "OSC B" header at the right position in Row 1
-    auto row1Header = bounds.removeFromTop (16);
-    int oscBHeaderX = row1Header.getX() + row1Header.getWidth() / 2 + 4;
-    g.drawText ("OSC B", oscBHeaderX, row1Header.getY(), row1Header.getWidth() / 2 - 4,
-                row1Header.getHeight(), juce::Justification::centredLeft);
+        // Subtle outline
+        g.setColour (Colors::divider);
+        g.drawRoundedRectangle (sectionBounds, cornerR, 0.5f);
+
+        // Accent stripe at top — fill rounded rect then cover bottom half to keep only top corners rounded
+        auto accentBar = sectionBounds.withHeight ((float) accentH);
+        g.setColour (Colors::accentActive);
+        g.fillRoundedRectangle (accentBar.withHeight ((float) accentH + cornerR), cornerR);
+        // Cover the bottom rounded corners with a flat rect
+        g.fillRect (accentBar.withTrimmedTop (1.0f));
+
+        // Section label
+        g.setColour (Colors::textPrimary);
+        g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+        g.drawText (sectionNames[i],
+                    sectionBounds.getX() + 10.0f,
+                    sectionBounds.getY() + (float) accentH + 2.0f,
+                    sectionBounds.getWidth() - 20.0f,
+                    (float) headerH,
+                    juce::Justification::centredLeft);
+
+        // Row 1: draw OSC B label on right half and vertical divider
+        if (i == 0)
+        {
+            float divX = sectionBounds.getX() + sectionBounds.getWidth() * 0.5f;
+            g.setColour (Colors::divider);
+            g.drawVerticalLine ((int) divX,
+                                sectionBounds.getY() + (float) accentH + 4.0f,
+                                sectionBounds.getBottom() - 6.0f);
+
+            g.setColour (Colors::textPrimary);
+            g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+            g.drawText ("OSC B",
+                        divX + 10.0f,
+                        sectionBounds.getY() + (float) accentH + 2.0f,
+                        sectionBounds.getWidth() * 0.5f - 20.0f,
+                        (float) headerH,
+                        juce::Justification::centredLeft);
+
+            // Rename first section label to "OSC A"
+            g.setColour (Colors::bgStrip);
+            g.fillRect (sectionBounds.getX() + 10.0f,
+                        sectionBounds.getY() + (float) accentH + 2.0f,
+                        100.0f, (float) headerH);
+            g.setColour (Colors::textPrimary);
+            g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+            g.drawText ("OSC A",
+                        sectionBounds.getX() + 10.0f,
+                        sectionBounds.getY() + (float) accentH + 2.0f,
+                        sectionBounds.getWidth() * 0.5f - 20.0f,
+                        (float) headerH,
+                        juce::Justification::centredLeft);
+        }
+    }
+
+    // NES vent groove decoration — 3 thin horizontal lines near bottom-left
+    {
+        float ventX = (float) bounds.getX() + 6.0f;
+        float ventY = (float) (bounds.getY() + 3 * sectionH + 2 * sectionGap) - 2.0f;
+        float ventW = 24.0f;
+        g.setColour (Colors::bgLight);
+        for (int v = 0; v < 3; ++v)
+        {
+            float y = ventY + (float) v * 3.0f;
+            g.drawHorizontalLine ((int) y, ventX, ventX + ventW);
+        }
+    }
 }
 
 void ModernPanelComponent::resized()
 {
-    auto bounds = getLocalBounds().reduced (12, 8);
-    int rowH = bounds.getHeight() / 3;
-    int knobW = 56;
-    int knobH = 56;
-    int labelH = 14;
+    auto bounds = getLocalBounds().reduced (10, 8);
+    const int sectionGap = 8;
+    const int sectionH = (bounds.getHeight() - 2 * sectionGap) / 3;
+    const int accentH = 3;
+    const int headerH = 18;
+    const int pad = 10;      // horizontal padding inside section
+    const int knobW = 56;
+    const int knobH = 56;
+    const int labelH = 14;
+
+    // Helper: content area within a section (below accent + header, with padding)
+    auto sectionContent = [&] (int index) -> juce::Rectangle<int>
+    {
+        int sy = bounds.getY() + index * (sectionH + sectionGap) + accentH + headerH + 2;
+        int sh = sectionH - accentH - headerH - 2 - 6; // 6px bottom padding
+        return juce::Rectangle<int> (bounds.getX() + pad, sy, bounds.getWidth() - 2 * pad, sh);
+    };
 
     // ─── Row 1: Osc A (left half) | Osc B (right half) ────────────────
-    auto row1 = bounds.removeFromTop (rowH);
-    row1.removeFromTop (18);  // Header space
-
-    auto r1area = row1.reduced (0, 2);
-    int r1y = r1area.getY();
-    int halfW = r1area.getWidth() / 2;
+    auto r1 = sectionContent (0);
+    int r1y = r1.getY();
+    int halfW = r1.getWidth() / 2;
 
     // Osc A: toggle + waveform combo
-    int x = r1area.getX();
+    int x = r1.getX();
     oscAToggle.setBounds (x, r1y, 36, 24);
     x += 38;
     waveformCombo.setBounds (x, r1y, 110, 24);
     waveformLabel.setBounds (x, r1y + 26, 110, labelH);
 
     // Osc B: toggle + waveform combo + level knob + detune knob
-    x = r1area.getX() + halfW + 4;
+    x = r1.getX() + halfW + 4;
     oscBToggle.setBounds (x, r1y, 36, 24);
     x += 38;
     waveformBCombo.setBounds (x, r1y, 110, 24);
@@ -211,59 +288,53 @@ void ModernPanelComponent::resized()
     oscBDetuneLabel.setBounds (x, r1y + knobH - 8, knobW, labelH);
 
     // ─── Row 2: Envelope — ADSR ─────────────────────────────────────────
-    auto row2 = bounds.removeFromTop (rowH);
-    row2.removeFromTop (18);
+    auto r2 = sectionContent (1);
+    int r2y = r2.getY();
+    x = r2.getX();
 
-    auto r2area = row2.reduced (0, 2);
-    int r2y = r2area.getY();
-    x = r2area.getX();
-
-    attackLabel.setBounds (x, r2y + knobH, knobW, labelH);
     attackKnob.setBounds (x, r2y, knobW, knobH);
+    attackLabel.setBounds (x, r2y + knobH, knobW, labelH);
     x += knobW + 8;
 
-    decayLabel.setBounds (x, r2y + knobH, knobW, labelH);
     decayKnob.setBounds (x, r2y, knobW, knobH);
+    decayLabel.setBounds (x, r2y + knobH, knobW, labelH);
     x += knobW + 8;
 
-    sustainLabel.setBounds (x, r2y + knobH, knobW, labelH);
     sustainKnob.setBounds (x, r2y, knobW, knobH);
+    sustainLabel.setBounds (x, r2y + knobH, knobW, labelH);
     x += knobW + 8;
 
-    releaseLabel.setBounds (x, r2y + knobH, knobW, labelH);
     releaseKnob.setBounds (x, r2y, knobW, knobH);
+    releaseLabel.setBounds (x, r2y + knobH, knobW, labelH);
 
     // ─── Row 3: Global — Voices, Volume, Unison, Detune, Porta, Vel->Flt
-    auto row3 = bounds;
-    row3.removeFromTop (18);
+    auto r3 = sectionContent (2);
+    int r3y = r3.getY();
+    x = r3.getX();
 
-    auto r3area = row3.reduced (0, 2);
-    int r3y = r3area.getY();
-    x = r3area.getX();
-
-    voicesLabel.setBounds (x, r3y + knobH, knobW, labelH);
     voicesKnob.setBounds (x, r3y, knobW, knobH);
+    voicesLabel.setBounds (x, r3y + knobH, knobW, labelH);
     x += knobW + 4;
 
-    volumeLabel.setBounds (x, r3y + knobH, knobW, labelH);
     volumeKnob.setBounds (x, r3y, knobW, knobH);
+    volumeLabel.setBounds (x, r3y + knobH, knobW, labelH);
     x += knobW + 4;
 
-    unisonLabel.setBounds (x, r3y + knobH, knobW, labelH);
     unisonKnob.setBounds (x, r3y, knobW, knobH);
+    unisonLabel.setBounds (x, r3y + knobH, knobW, labelH);
     x += knobW + 4;
 
-    detuneLabel.setBounds (x, r3y + knobH, knobW, labelH);
     detuneKnob.setBounds (x, r3y, knobW, knobH);
+    detuneLabel.setBounds (x, r3y + knobH, knobW, labelH);
     x += knobW + 8;
 
     portaToggle.setBounds (x, r3y, 54, 24);
-    portaTimeLabel.setBounds (x + 54, r3y + knobH, knobW, labelH);
     portaTimeKnob.setBounds (x + 54, r3y, knobW, knobH);
+    portaTimeLabel.setBounds (x + 54, r3y + knobH, knobW, labelH);
     x += 54 + knobW + 8;
 
-    velFilterLabel.setBounds (x, r3y + knobH, knobW, labelH);
     velFilterKnob.setBounds (x, r3y, knobW, knobH);
+    velFilterLabel.setBounds (x, r3y + knobH, knobW, labelH);
 }
 
 } // namespace cart
