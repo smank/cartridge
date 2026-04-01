@@ -4,12 +4,16 @@
 #include "Parameters.h"
 #include "PresetManager.h"
 #include "dsp/Apu.h"
+#include "dsp/WaveformBuffer.h"
 #include "dsp/effects/EffectsChain.h"
 #include "midi/MidiVoiceManager.h"
 #include "midi/ModernVoiceManager.h"
 #include "midi/Arpeggiator.h"
 #include "dsp/Lfo.h"
 #include "dsp/modern/ModernEngine.h"
+#include "ABCompare.h"
+#include "midi/TuningTable.h"
+#include "dsp/DpcmSampleManager.h"
 
 class CartridgeProcessor : public juce::AudioProcessor
 {
@@ -49,6 +53,18 @@ public:
     bool getHoldMode() const   { return holdMode.load(); }
     bool getSustainPedal() const { return sustainPedal.load(); }
 
+    void triggerDspReset() { pendingDspReset.store(true); }
+
+    cart::DpcmSampleManager& getDpcmSampleManager() { return dpcmSampleManager; }
+
+    cart::ABCompare abCompare;
+
+    // Per-channel activity flags for UI LEDs (audio thread writes, UI reads)
+    std::atomic<bool> channelActive[8] = {};
+
+    // Waveform ring buffer for oscilloscope display
+    cart::WaveformBuffer waveformBuffer;
+
 private:
     void updateDspFromParameters();
 
@@ -64,6 +80,8 @@ private:
     cart::EffectsChain     effectsChain;
     cart::Arpeggiator      arpeggiator;
     cart::Lfo              lfo;
+    cart::TuningTable      tuningTable;
+    cart::DpcmSampleManager dpcmSampleManager;
     bool                   usingModernEngine = false;
     int                    lastArpNote = -1;
     int                    fadeInSamplesRemaining = 0;
@@ -178,6 +196,19 @@ private:
     std::atomic<float>* modOscBLevelParam    = nullptr;
     std::atomic<float>* modOscBDetuneParam   = nullptr;
 
+    // Custom CC mapping params
+    std::atomic<float>* userCC1NumParam    = nullptr;
+    std::atomic<float>* userCC1TargetParam = nullptr;
+    std::atomic<float>* userCC2NumParam    = nullptr;
+    std::atomic<float>* userCC2TargetParam = nullptr;
+    std::atomic<float>* userCC3NumParam    = nullptr;
+    std::atomic<float>* userCC3TargetParam = nullptr;
+    std::atomic<float>* userCC4NumParam    = nullptr;
+    std::atomic<float>* userCC4TargetParam = nullptr;
+
+    // Tuning system
+    std::atomic<float>* tuningSystemParam = nullptr;
+
     // Cached previous values for change detection
     struct CachedParams
     {
@@ -212,6 +243,8 @@ private:
         float vrc6P1Duty = -1.0f, vrc6P1Volume = -1.0f, vrc6P1Mix = -1.0f;
         float vrc6P2Duty = -1.0f, vrc6P2Volume = -1.0f, vrc6P2Mix = -1.0f;
         float vrc6SawRate = -1.0f, vrc6SawMix = -1.0f;
+
+        float tuningSystem = -1.0f;
     } cachedParams;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CartridgeProcessor)

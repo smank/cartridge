@@ -150,6 +150,9 @@ void ModernVoice::reset()
     currentNote = -1;
     age = 0;
     velocityGain = 1.0f;
+    perVoicePitchBend = 1.0f;
+    mpeSlide = 0.5f;
+    mpePressure = 0.0f;
 
     for (auto& osc : oscillators)
         osc.reset();
@@ -159,12 +162,15 @@ void ModernVoice::reset()
 
 void ModernVoice::updateOscFrequencies()
 {
+    // Apply per-voice MPE pitch bend to base frequency
+    float bentFreq = baseFreq * perVoicePitchBend;
+
     // Osc B base frequency with semitone offset
-    float freqB = baseFreq * std::pow (2.0f, oscBDetuneSemi / 12.0f);
+    float freqB = bentFreq * std::pow (2.0f, oscBDetuneSemi / 12.0f);
 
     if (unisonCount == 1)
     {
-        oscillators[0].setFrequency (baseFreq);
+        oscillators[0].setFrequency (bentFreq);
         oscillatorsB[0].setFrequency (freqB);
         return;
     }
@@ -174,7 +180,7 @@ void ModernVoice::updateOscFrequencies()
     {
         float offset = (static_cast<float> (i) - static_cast<float> (unisonCount - 1) / 2.0f)
                       * (unisonDetune / std::max (static_cast<float> (unisonCount - 1), 1.0f));
-        float freqA = baseFreq * std::pow (2.0f, offset / 1200.0f);
+        float freqA = bentFreq * std::pow (2.0f, offset / 1200.0f);
         oscillators[i].setFrequency (freqA);
         oscillatorsB[i].setFrequency (freqB * std::pow (2.0f, offset / 1200.0f));
     }

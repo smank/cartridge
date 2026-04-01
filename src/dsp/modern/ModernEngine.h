@@ -23,8 +23,10 @@ public:
     void setPortamento (bool en, float time);
     void setMasterVolume (float vol);
 
-    void noteOn (int note, float velocity, float freqHz);
+    /// Returns voice index assigned, or -1 if no voice available.
+    int  noteOn (int note, float velocity, float freqHz);
     void noteOff (int note);
+    void noteOffByIndex (int voiceIndex);
     void allNotesOff();
 
     float process();
@@ -35,6 +37,23 @@ public:
     /// For LFO vibrato
     void applyPitchMultiplier (float mult);
 
+    // MPE per-voice methods
+    void setPerVoicePitchBend (int voiceIndex, float semitones);
+    void setPerVoiceSlide (int voiceIndex, float value01);
+    void setPerVoicePressure (int voiceIndex, float value01);
+
+    /// Store MIDI channel for a voice (for MPE routing)
+    void setVoiceMidiChannel (int voiceIndex, int midiChannel);
+    int  getVoiceMidiChannel (int voiceIndex) const;
+
+    /// Find voice by MIDI channel (for MPE per-note routing)
+    int findVoiceForChannel (int midiChannel) const;
+
+    /// Find voice by note and channel (for MPE note-off)
+    int findVoiceForNoteAndChannel (int note, int midiChannel) const;
+
+    static constexpr int getMaxVoiceCount() { return maxVoiceCount; }
+
 private:
     int findVoiceForNote (int note) const;
     int findFreeVoice() const;
@@ -44,6 +63,7 @@ private:
     static constexpr int maxVoiceCount = 16;
 
     ModernVoice voices[maxVoiceCount];
+    int         voiceMidiChannel[maxVoiceCount] = {}; // MIDI channel per voice (for MPE)
     int         maxVoices    = 8;
     float       masterVolume = 0.8f;
     float       pitchBendMult = 1.0f;

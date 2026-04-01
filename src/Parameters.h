@@ -150,6 +150,19 @@ namespace ParamIDs {
     inline constexpr const char* RvDamping        = "rvDamping";
     inline constexpr const char* RvWidth          = "rvWidth";
     inline constexpr const char* RvMix            = "rvMix";
+
+    // Custom CC Mappings
+    inline constexpr const char* UserCC1Num     = "userCC1Num";
+    inline constexpr const char* UserCC1Target  = "userCC1Target";
+    inline constexpr const char* UserCC2Num     = "userCC2Num";
+    inline constexpr const char* UserCC2Target  = "userCC2Target";
+    inline constexpr const char* UserCC3Num     = "userCC3Num";
+    inline constexpr const char* UserCC3Target  = "userCC3Target";
+    inline constexpr const char* UserCC4Num     = "userCC4Num";
+    inline constexpr const char* UserCC4Target  = "userCC4Target";
+
+    // Tuning System
+    inline constexpr const char* TuningSystem   = "tuningSystem";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

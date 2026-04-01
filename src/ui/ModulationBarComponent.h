@@ -22,6 +22,7 @@ public:
     void collapseAll();
 
     std::function<void()> onHeightChanged;
+    std::function<void(const juce::File&)> onDpcmLoad;
 
     static constexpr int headerHeight = 32;
     static constexpr int detailHeight = 100;
@@ -68,6 +69,8 @@ private:
     juce::ComboBox dpcmSample;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> dpcmSampleAttach;
     juce::Label dpcmSampleLabel;
+    juce::TextButton dpcmLoadButton { "Load" };
+    std::shared_ptr<juce::FileChooser> dpcmFileChooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulationBarComponent)
 };

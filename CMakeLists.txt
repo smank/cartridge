@@ -57,6 +57,7 @@ target_sources(Cartridge
         src/dsp/channels/NoiseChannel.cpp
         src/dsp/channels/DpcmChannel.cpp
         src/dsp/DpcmSamples.cpp
+        src/dsp/DpcmSampleManager.cpp
         src/dsp/channels/Vrc6PulseChannel.cpp
         src/dsp/channels/Vrc6SawChannel.cpp
         src/dsp/modern/ModernVoice.cpp
@@ -72,6 +73,7 @@ target_sources(Cartridge
         src/ui/ModulationBarComponent.cpp
         src/ui/ModernPanelComponent.cpp
         src/ui/StatusBarComponent.cpp
+        src/ui/WaveformDisplay.cpp
         src/midi/MidiVoiceManager.cpp
         src/midi/ModernVoiceManager.cpp
         src/midi/Arpeggiator.cpp

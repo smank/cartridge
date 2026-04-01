@@ -1,5 +1,6 @@
 #include "ModernPanelComponent.h"
 #include "Parameters.h"
+#include <cmath>
 
 namespace cart {
 
@@ -129,11 +130,11 @@ ModernPanelComponent::ModernPanelComponent (juce::AudioProcessorValueTreeState& 
 
 void ModernPanelComponent::styleKnob (juce::Slider& knob)
 {
-    knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 14);
-    knob.setColour (juce::Slider::rotarySliderFillColourId, Colors::accentActive);
-    knob.setColour (juce::Slider::rotarySliderOutlineColourId, Colors::knobOutline);
+    knob.setSliderStyle (juce::Slider::LinearVertical);
+    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 48, 14);
+    knob.setColour (juce::Slider::trackColourId, Colors::accentDim);
     knob.setColour (juce::Slider::thumbColourId, Colors::accentActive);
+    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline);
     knob.setColour (juce::Slider::textBoxTextColourId, Colors::textPrimary);
     knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
 }
@@ -141,7 +142,7 @@ void ModernPanelComponent::styleKnob (juce::Slider& knob)
 void ModernPanelComponent::makeLabel (juce::Label& label, const juce::String& text)
 {
     label.setText (text, juce::dontSendNotification);
-    label.setFont (juce::FontOptions (11.0f));
+    label.setFont (juce::FontOptions (12.0f));
     label.setColour (juce::Label::textColourId, Colors::textSecondary);
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);
@@ -149,192 +150,194 @@ void ModernPanelComponent::makeLabel (juce::Label& label, const juce::String& te
 
 void ModernPanelComponent::paint (juce::Graphics& g)
 {
-    // Dark chassis background (visible between section panels)
     g.setColour (Colors::bgDark);
     g.fillRect (getLocalBounds());
 
-    auto bounds = getLocalBounds().reduced (10, 8);
-    const int sectionGap = 8;
+    auto bounds = getLocalBounds().reduced (8, 4);
+    const int sectionGap = 4;
     const int sectionH = (bounds.getHeight() - 2 * sectionGap) / 3;
     const float cornerR = 6.0f;
     const int accentH = 3;
-    const int headerH = 18;
-    const juce::String sectionNames[] = { "OSCILLATORS", "ENVELOPE", "GLOBAL" };
+    const int headerH = 20;
+    const int pad = 12;
+
+    const char* sectionNames[] = { nullptr, "ENVELOPE", "GLOBAL" };
 
     for (int i = 0; i < 3; ++i)
     {
-        auto sectionBounds = juce::Rectangle<float> (
+        auto sb = juce::Rectangle<float> (
             (float) bounds.getX(),
             (float) (bounds.getY() + i * (sectionH + sectionGap)),
             (float) bounds.getWidth(),
             (float) sectionH);
 
-        // Section panel background
+        // Panel background + outline
         g.setColour (Colors::bgStrip);
-        g.fillRoundedRectangle (sectionBounds, cornerR);
-
-        // Subtle outline
+        g.fillRoundedRectangle (sb, cornerR);
         g.setColour (Colors::divider);
-        g.drawRoundedRectangle (sectionBounds, cornerR, 0.5f);
+        g.drawRoundedRectangle (sb, cornerR, 0.5f);
 
-        // Accent stripe at top — fill rounded rect then cover bottom half to keep only top corners rounded
-        auto accentBar = sectionBounds.withHeight ((float) accentH);
-        g.setColour (Colors::accentActive);
-        g.fillRoundedRectangle (accentBar.withHeight ((float) accentH + cornerR), cornerR);
-        // Cover the bottom rounded corners with a flat rect
-        g.fillRect (accentBar.withTrimmedTop (1.0f));
+        // Accent stripe — clipped
+        {
+            g.saveState();
+            g.reduceClipRegion (sb.toNearestIntEdges());
+            g.setColour (Colors::accentActive);
+            g.fillRect (sb.withHeight ((float) accentH));
+            g.restoreState();
+        }
 
-        // Section label
-        g.setColour (Colors::textPrimary);
-        g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
-        g.drawText (sectionNames[i],
-                    sectionBounds.getX() + 10.0f,
-                    sectionBounds.getY() + (float) accentH + 2.0f,
-                    sectionBounds.getWidth() - 20.0f,
-                    (float) headerH,
-                    juce::Justification::centredLeft);
+        // Header text below accent — must match resized() headerArea
+        float labelY = sb.getY() + (float) accentH + 2.0f;
+        float p = (float) pad;
 
-        // Row 1: draw OSC B label on right half and vertical divider
         if (i == 0)
         {
-            float divX = sectionBounds.getX() + sectionBounds.getWidth() * 0.5f;
-            g.setColour (Colors::divider);
-            g.drawVerticalLine ((int) divX,
-                                sectionBounds.getY() + (float) accentH + 4.0f,
-                                sectionBounds.getBottom() - 6.0f);
+            float divX = sb.getX() + std::floor (sb.getWidth() * 0.5f);
 
-            g.setColour (Colors::textPrimary);
-            g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
-            g.drawText ("OSC B",
-                        divX + 10.0f,
-                        sectionBounds.getY() + (float) accentH + 2.0f,
-                        sectionBounds.getWidth() * 0.5f - 20.0f,
-                        (float) headerH,
-                        juce::Justification::centredLeft);
-
-            // Rename first section label to "OSC A"
-            g.setColour (Colors::bgStrip);
-            g.fillRect (sectionBounds.getX() + 10.0f,
-                        sectionBounds.getY() + (float) accentH + 2.0f,
-                        100.0f, (float) headerH);
             g.setColour (Colors::textPrimary);
             g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
             g.drawText ("OSC A",
-                        sectionBounds.getX() + 10.0f,
-                        sectionBounds.getY() + (float) accentH + 2.0f,
-                        sectionBounds.getWidth() * 0.5f - 20.0f,
-                        (float) headerH,
+                        juce::Rectangle<float> (sb.getX() + p, labelY, divX - sb.getX() - p, (float) headerH),
                         juce::Justification::centredLeft);
-        }
-    }
+            g.drawText ("OSC B",
+                        juce::Rectangle<float> (divX + p, labelY, sb.getRight() - divX - p, (float) headerH),
+                        juce::Justification::centredLeft);
 
-    // NES vent groove decoration — 3 thin horizontal lines near bottom-left
-    {
-        float ventX = (float) bounds.getX() + 6.0f;
-        float ventY = (float) (bounds.getY() + 3 * sectionH + 2 * sectionGap) - 2.0f;
-        float ventW = 24.0f;
-        g.setColour (Colors::bgLight);
-        for (int v = 0; v < 3; ++v)
+            g.setColour (Colors::divider);
+            g.drawVerticalLine ((int) divX,
+                                sb.getY() + (float) accentH + 2.0f,
+                                sb.getBottom() - 4.0f);
+        }
+        else
         {
-            float y = ventY + (float) v * 3.0f;
-            g.drawHorizontalLine ((int) y, ventX, ventX + ventW);
+            g.setColour (Colors::textPrimary);
+            g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+            g.drawText (sectionNames[i],
+                        juce::Rectangle<float> (sb.getX() + p, labelY, sb.getWidth() - 2.0f * p, (float) headerH),
+                        juce::Justification::centredLeft);
         }
     }
 }
 
 void ModernPanelComponent::resized()
 {
-    auto bounds = getLocalBounds().reduced (10, 8);
-    const int sectionGap = 8;
+    auto bounds = getLocalBounds().reduced (8, 4);
+    const int sectionGap = 4;
     const int sectionH = (bounds.getHeight() - 2 * sectionGap) / 3;
     const int accentH = 3;
-    const int headerH = 18;
-    const int pad = 10;      // horizontal padding inside section
-    const int knobW = 56;
-    const int knobH = 56;
+    const int headerH = 20;
+    const int headerArea = accentH + 2 + headerH;  // accent + gap + header text
+    const int pad = 12;
     const int labelH = 14;
+    const int bottomPad = 2;
 
-    // Helper: content area within a section (below accent + header, with padding)
+    // Derive slider sizes from available section content height
+    int contentH = sectionH - headerArea - bottomPad;
+    int knobH = juce::jmax (56, contentH - labelH);  // slider height (tall)
+    int knobW = 40;  // vertical sliders are narrow
+
+    // Combo / toggle sizing
+    int comboH = juce::jlimit (22, 28, knobH / 2);
+    int comboW = juce::jlimit (100, 140, knobH * 2);
+    int toggleW = juce::jlimit (36, 44, knobH * 2 / 3);
+    int toggleH = comboH;
+
+    // Content area within a section
     auto sectionContent = [&] (int index) -> juce::Rectangle<int>
     {
-        int sy = bounds.getY() + index * (sectionH + sectionGap) + accentH + headerH + 2;
-        int sh = sectionH - accentH - headerH - 2 - 6; // 6px bottom padding
-        return juce::Rectangle<int> (bounds.getX() + pad, sy, bounds.getWidth() - 2 * pad, sh);
+        int sy = bounds.getY() + index * (sectionH + sectionGap) + headerArea;
+        return juce::Rectangle<int> (bounds.getX() + pad, sy, bounds.getWidth() - 2 * pad, contentH);
     };
 
-    // ─── Row 1: Osc A (left half) | Osc B (right half) ────────────────
+    // Nudge controls slightly above center
+    const int nudgeUp = 6;
+
+    // ─── Section 1: Oscillators — OSC A (left) | OSC B (right) ─────────
     auto r1 = sectionContent (0);
-    int r1y = r1.getY();
     int halfW = r1.getWidth() / 2;
 
-    // Osc A: toggle + waveform combo
-    int x = r1.getX();
-    oscAToggle.setBounds (x, r1y, 36, 24);
-    x += 38;
-    waveformCombo.setBounds (x, r1y, 110, 24);
-    waveformLabel.setBounds (x, r1y + 26, 110, labelH);
+    int comboBlockH = comboH + 2 + labelH;
+    int comboY = r1.getY() + (r1.getHeight() - comboBlockH) / 2 - nudgeUp;
+    int sliderBlockH = knobH + labelH;
+    int knobY1 = r1.getY() + (r1.getHeight() - sliderBlockH) / 2 - nudgeUp;
 
-    // Osc B: toggle + waveform combo + level knob + detune knob
-    x = r1.getX() + halfW + 4;
-    oscBToggle.setBounds (x, r1y, 36, 24);
-    x += 38;
-    waveformBCombo.setBounds (x, r1y, 110, 24);
-    waveformBLabel.setBounds (x, r1y + 26, 110, labelH);
-    x += 118;
-    oscBLevelKnob.setBounds (x, r1y - 4, knobW, knobH);
-    oscBLevelLabel.setBounds (x, r1y + knobH - 8, knobW, labelH);
-    x += knobW + 4;
-    oscBDetuneKnob.setBounds (x, r1y - 4, knobW, knobH);
-    oscBDetuneLabel.setBounds (x, r1y + knobH - 8, knobW, labelH);
+    // Osc A: center toggle+combo in left half
+    {
+        int groupW = toggleW + 6 + comboW;
+        int x0 = r1.getX() + (halfW - groupW) / 2;
+        oscAToggle.setBounds (x0, comboY, toggleW, toggleH);
+        waveformCombo.setBounds (x0 + toggleW + 6, comboY, comboW, comboH);
+        waveformLabel.setBounds (x0 + toggleW + 6, comboY + comboH + 2, comboW, labelH);
+    }
 
-    // ─── Row 2: Envelope — ADSR ─────────────────────────────────────────
+    // Osc B: center toggle+combo+sliders in right half
+    {
+        int groupW = toggleW + 6 + comboW + 12 + knobW + 6 + knobW;
+        int x0 = r1.getX() + halfW + (halfW - groupW) / 2;
+        oscBToggle.setBounds (x0, comboY, toggleW, toggleH);
+        x0 += toggleW + 6;
+        waveformBCombo.setBounds (x0, comboY, comboW, comboH);
+        waveformBLabel.setBounds (x0, comboY + comboH + 2, comboW, labelH);
+        x0 += comboW + 12;
+        oscBLevelKnob.setBounds (x0, knobY1, knobW, knobH);
+        oscBLevelLabel.setBounds (x0, knobY1 + knobH, knobW, labelH);
+        x0 += knobW + 6;
+        oscBDetuneKnob.setBounds (x0, knobY1, knobW, knobH);
+        oscBDetuneLabel.setBounds (x0, knobY1 + knobH, knobW, labelH);
+    }
+
+    // ─── Section 2: Envelope — 4 ADSR sliders, evenly distributed ──────
     auto r2 = sectionContent (1);
-    int r2y = r2.getY();
-    x = r2.getX();
+    int knobY2 = r2.getY() + (r2.getHeight() - sliderBlockH) / 2 - nudgeUp;
+    {
+        const int n = 4;
+        int gap = (r2.getWidth() - n * knobW) / (n + 1);
+        int x = r2.getX() + gap;
 
-    attackKnob.setBounds (x, r2y, knobW, knobH);
-    attackLabel.setBounds (x, r2y + knobH, knobW, labelH);
-    x += knobW + 8;
+        juce::Slider* knobs[] = { &attackKnob, &decayKnob, &sustainKnob, &releaseKnob };
+        juce::Label* labels[] = { &attackLabel, &decayLabel, &sustainLabel, &releaseLabel };
 
-    decayKnob.setBounds (x, r2y, knobW, knobH);
-    decayLabel.setBounds (x, r2y + knobH, knobW, labelH);
-    x += knobW + 8;
+        for (int k = 0; k < n; ++k)
+        {
+            knobs[k]->setBounds (x, knobY2, knobW, knobH);
+            labels[k]->setBounds (x, knobY2 + knobH, knobW, labelH);
+            x += knobW + gap;
+        }
+    }
 
-    sustainKnob.setBounds (x, r2y, knobW, knobH);
-    sustainLabel.setBounds (x, r2y + knobH, knobW, labelH);
-    x += knobW + 8;
-
-    releaseKnob.setBounds (x, r2y, knobW, knobH);
-    releaseLabel.setBounds (x, r2y + knobH, knobW, labelH);
-
-    // ─── Row 3: Global — Voices, Volume, Unison, Detune, Porta, Vel->Flt
+    // ─── Section 3: Global — 5 sliders + porta(toggle+slider) + vel ────
     auto r3 = sectionContent (2);
-    int r3y = r3.getY();
-    x = r3.getX();
+    int knobY3 = r3.getY() + (r3.getHeight() - sliderBlockH) / 2 - nudgeUp;
+    {
+        int portaToggleW = 50;
+        int portaSlotW = portaToggleW + 4 + knobW;
+        int totalW = 5 * knobW + portaSlotW;
+        int nSlots = 7;
+        int gap = juce::jmax (2, (r3.getWidth() - totalW) / (nSlots + 1));
+        int x = r3.getX() + gap;
 
-    voicesKnob.setBounds (x, r3y, knobW, knobH);
-    voicesLabel.setBounds (x, r3y + knobH, knobW, labelH);
-    x += knobW + 4;
+        juce::Slider* gKnobs[] = { &voicesKnob, &volumeKnob, &unisonKnob, &detuneKnob };
+        juce::Label* gLabels[] = { &voicesLabel, &volumeLabel, &unisonLabel, &detuneLabel };
 
-    volumeKnob.setBounds (x, r3y, knobW, knobH);
-    volumeLabel.setBounds (x, r3y + knobH, knobW, labelH);
-    x += knobW + 4;
+        for (int k = 0; k < 4; ++k)
+        {
+            gKnobs[k]->setBounds (x, knobY3, knobW, knobH);
+            gLabels[k]->setBounds (x, knobY3 + knobH, knobW, labelH);
+            x += knobW + gap;
+        }
 
-    unisonKnob.setBounds (x, r3y, knobW, knobH);
-    unisonLabel.setBounds (x, r3y + knobH, knobW, labelH);
-    x += knobW + 4;
+        // Porta toggle + time slider
+        int portaToggleY = knobY3 + (knobH - toggleH) / 2;
+        portaToggle.setBounds (x, portaToggleY, portaToggleW, toggleH);
+        x += portaToggleW + 4;
+        portaTimeKnob.setBounds (x, knobY3, knobW, knobH);
+        portaTimeLabel.setBounds (x, knobY3 + knobH, knobW, labelH);
+        x += knobW + gap;
 
-    detuneKnob.setBounds (x, r3y, knobW, knobH);
-    detuneLabel.setBounds (x, r3y + knobH, knobW, labelH);
-    x += knobW + 8;
-
-    portaToggle.setBounds (x, r3y, 54, 24);
-    portaTimeKnob.setBounds (x + 54, r3y, knobW, knobH);
-    portaTimeLabel.setBounds (x + 54, r3y + knobH, knobW, labelH);
-    x += 54 + knobW + 8;
-
-    velFilterKnob.setBounds (x, r3y, knobW, knobH);
-    velFilterLabel.setBounds (x, r3y + knobH, knobW, labelH);
+        // Vel>Flt
+        velFilterKnob.setBounds (x, knobY3, knobW, knobH);
+        velFilterLabel.setBounds (x, knobY3 + knobH, knobW, labelH);
+    }
 }
 
 } // namespace cart

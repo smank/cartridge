@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Colors.h"
@@ -18,7 +19,8 @@ enum class ChannelType
     Vrc6Saw
 };
 
-class ChannelStripComponent : public juce::Component
+class ChannelStripComponent : public juce::Component,
+                              private juce::Timer
 {
 public:
     ChannelStripComponent (ChannelType type,
@@ -27,8 +29,12 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void timerCallback() override;
 
     ChannelType getChannelType() const { return channelType; }
+
+    /// Set pointer to the processor's activity flag for this channel
+    void setActivityFlag (std::atomic<bool>* flag) { activityFlag = flag; }
 
 private:
     void setupPulseControls (const juce::String& prefix,
@@ -117,6 +123,10 @@ private:
     bool hasMainCombo = false;
     bool hasMainKnob = false;
     bool hasTranspose = false;
+
+    // Activity LED
+    std::atomic<bool>* activityFlag = nullptr;
+    bool ledState = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelStripComponent)
 };
