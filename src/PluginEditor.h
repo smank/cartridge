@@ -8,6 +8,7 @@
 #include "ui/ModulationBarComponent.h"
 #include "ui/StatusBarComponent.h"
 #include "ui/ModernPanelComponent.h"
+#include "ui/WaveformDisplay.h"
 #include "ui/Colors.h"
 #include "ui/FullscreenHelper.h"
 
@@ -26,6 +27,7 @@ private:
     [[maybe_unused]] CartridgeProcessor& processorRef;
 
     cart::TopBarComponent topBar;
+    cart::WaveformDisplay waveformDisplay;
     cart::ChannelStripArea channelStrips;
     cart::ModernPanelComponent modernPanel;
     cart::EffectsBarComponent effectsBar;
@@ -44,10 +46,11 @@ private:
     void saveScalePreference();
     juce::File getSettingsFile() const;
 
-    static constexpr int topBarHeight = 68;
+    static constexpr int topBarHeight = 96;
+    static constexpr int waveformHeight = 60;
     static constexpr int statusBarHeight = 28;
-    static constexpr int baseWidth = 900;
-    static constexpr int baseHeight = 700;
+    static constexpr int baseWidth = 940;
+    static constexpr int baseHeight = 720;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CartridgeEditor)
 };

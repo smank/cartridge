@@ -4,6 +4,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     : AudioProcessorEditor (p),
       processorRef (p),
       topBar (p, p.getApvts()),
+      waveformDisplay (p.waveformBuffer),
       channelStrips (p.getApvts()),
       modernPanel (p.getApvts()),
       effectsBar (p.getApvts()),
@@ -36,6 +37,18 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     // Wire up UI scaling from top bar
     topBar.onScaleChanged = [this] (float s) { applyScale (s); };
 
+    // Wire up DPCM sample loading from modulation bar
+    modulationBar.onDpcmLoad = [this] (const juce::File& file)
+    {
+        int slot = processorRef.getDpcmSampleManager().loadFromFile (file);
+        if (slot >= 0)
+        {
+            // Select the newly loaded sample
+            if (auto* param = processorRef.getApvts().getParameter (cart::ParamIDs::DpcmSample))
+                param->setValueNotifyingHost (param->convertTo0to1 (static_cast<float> (slot)));
+        }
+    };
+
     // Wire up FX panel height changes
     effectsBar.onHeightChanged = [this] { resized(); };
     modulationBar.onHeightChanged = [this] { resized(); };
@@ -63,7 +76,11 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     keyboard.setKeyPressBaseOctave (5);  // QWERTY keys start at C4 (middle C)
     keyboard.setVelocity (0.8f, true);   // QWERTY velocity; mouse uses click position
 
+    // Wire activity LED flags from processor to channel strips
+    channelStrips.setActivityFlags (p.channelActive);
+
     addAndMakeVisible (topBar);
+    addAndMakeVisible (waveformDisplay);
     addAndMakeVisible (channelStrips);
     addChildComponent (modernPanel);  // Hidden by default (Classic mode)
     addAndMakeVisible (effectsBar);
@@ -93,7 +110,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
     setSize (initW, initH);
     setResizable (true, true);
-    setResizeLimits (juce::jmin (initW, 700), juce::jmin (initH, 560), 3840, 2160);
+    setResizeLimits (juce::jmin (initW, 800), juce::jmin (initH, 640), 3840, 2160);
     setWantsKeyboardFocus (true);
 
     // Editor keeps focus so shortcut keys ([, ], -, =, Tab, etc.) are handled
@@ -140,7 +157,7 @@ void CartridgeEditor::applyScale (float scale)
     currentScale = scale;
     int w = juce::roundToInt (baseWidth * scale);
     int h = juce::roundToInt (baseHeight * scale);
-    setResizeLimits (juce::jmin (w, 700), juce::jmin (h, 560), 3840, 2160);
+    setResizeLimits (juce::jmin (w, 800), juce::jmin (h, 640), 3840, 2160);
     setSize (w, h);
     saveScalePreference();
 }
@@ -191,6 +208,7 @@ void CartridgeEditor::resized()
         area = area.withSizeKeepingCentre (maxContentWidth, area.getHeight());
 
     topBar.setBounds (area.removeFromTop (topBarHeight));
+    waveformDisplay.setBounds (area.removeFromTop (waveformHeight).reduced (4, 2));
 
     // Scale keyboard height proportionally (20% of window, clamped)
     int kbHeight = juce::jlimit (100, 220, getHeight() / 5);

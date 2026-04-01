@@ -7,21 +7,33 @@ namespace
 {
     void styleKnob (juce::Slider& knob)
     {
-        knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-        knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 48, 14);
-        knob.setColour (juce::Slider::rotarySliderFillColourId, Colors::accentActive);
-        knob.setColour (juce::Slider::rotarySliderOutlineColourId, Colors::knobOutline);
-        knob.setColour (juce::Slider::thumbColourId, Colors::accentActive);
+        knob.setSliderStyle (juce::Slider::LinearHorizontal);
+        knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 36, 14);
+        knob.setColour (juce::Slider::trackColourId, Colors::faderTrack);
+        knob.setColour (juce::Slider::thumbColourId, Colors::faderThumb);
+        knob.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
+        knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
+        knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    }
+
+    void styleDetailKnob (juce::Slider& knob)
+    {
+        knob.setSliderStyle (juce::Slider::LinearHorizontal);
+        knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 36, 14);
+        knob.setColour (juce::Slider::trackColourId, Colors::faderTrack);
+        knob.setColour (juce::Slider::thumbColourId, Colors::faderThumb);
+        knob.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
         knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
         knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     }
 
     void styleFader (juce::Slider& fader)
     {
-        fader.setSliderStyle (juce::Slider::LinearVertical);
-        fader.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 48, 14);
+        fader.setSliderStyle (juce::Slider::LinearHorizontal);
+        fader.setTextBoxStyle (juce::Slider::TextBoxRight, false, 36, 14);
         fader.setColour (juce::Slider::trackColourId, Colors::faderTrack);
         fader.setColour (juce::Slider::thumbColourId, Colors::faderThumb);
+        fader.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
         fader.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
         fader.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     }
@@ -93,9 +105,25 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
         case ChannelType::Vrc6Pulse2: setupVrc6PulseControls ("vrc6P2", apvts); break;
         case ChannelType::Vrc6Saw:    setupVrc6SawControls (apvts); break;
     }
+
+    startTimerHz (15);
 }
 
-ChannelStripComponent::~ChannelStripComponent() = default;
+ChannelStripComponent::~ChannelStripComponent()
+{
+    stopTimer();
+}
+
+void ChannelStripComponent::timerCallback()
+{
+    bool newState = (activityFlag != nullptr) && activityFlag->load (std::memory_order_relaxed);
+    if (newState != ledState)
+    {
+        ledState = newState;
+        // Only repaint the header area (top 22px)
+        repaint (0, 0, getWidth(), 22);
+    }
+}
 
 bool ChannelStripComponent::isVrc6() const
 {
@@ -160,7 +188,7 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
     sweepEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, prefix + "SweepEnable", sweepEnableToggle);
 
-    styleKnob (sweepPeriodKnob);
+    styleDetailKnob (sweepPeriodKnob);
     addChildComponent (sweepPeriodKnob);
     sweepPeriodAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "SweepPeriod", sweepPeriodKnob);
@@ -170,7 +198,7 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
     sweepNegateAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, prefix + "SweepNegate", sweepNegateToggle);
 
-    styleKnob (sweepShiftKnob);
+    styleDetailKnob (sweepShiftKnob);
     addChildComponent (sweepShiftKnob);
     sweepShiftAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "SweepShift", sweepShiftKnob);
@@ -211,7 +239,7 @@ void ChannelStripComponent::setupTriangleControls (juce::AudioProcessorValueTree
     hasDetails = true;
     addAndMakeVisible (detailsButton);
 
-    styleKnob (linearReloadKnob);
+    styleDetailKnob (linearReloadKnob);
     addChildComponent (linearReloadKnob);
     linearReloadAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::TriLinearReload, linearReloadKnob);
@@ -384,79 +412,181 @@ void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeS
 
 void ChannelStripComponent::paint (juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
+    auto bounds = getLocalBounds().toFloat().reduced (1.0f);
+    const float cornerR = 6.0f;
 
     // Rounded background
     g.setColour (Colors::bgStrip);
-    g.fillRoundedRectangle (bounds.reduced (1.0f), 4.0f);
+    g.fillRoundedRectangle (bounds, cornerR);
 
     // Subtle outline
     g.setColour (Colors::divider);
-    g.drawRoundedRectangle (bounds.reduced (1.0f), 4.0f, 0.5f);
+    g.drawRoundedRectangle (bounds, cornerR, 0.5f);
+
+    // Accent stripe at top — clipped to panel bounds
+    {
+        g.saveState();
+        g.reduceClipRegion (bounds.toNearestIntEdges());
+        g.setColour (isVrc6() ? Colors::orangeAccent : Colors::accentActive);
+        g.fillRect (bounds.withHeight (3.0f));
+        g.restoreState();
+    }
+
+    // Activity LED — small circle to the left of the name label
+    {
+        auto nameBounds = nameLabel.getBounds();
+        float ledSize = 8.0f;
+        float ledX = static_cast<float> (nameBounds.getX()) - ledSize - 2.0f;
+        float ledY = static_cast<float> (nameBounds.getCentreY()) - ledSize * 0.5f;
+
+        if (ledState)
+        {
+            g.setColour (isVrc6() ? Colors::orangeAccent : Colors::accentActive);
+            g.fillEllipse (ledX, ledY, ledSize, ledSize);
+            // Glow effect
+            g.setColour ((isVrc6() ? Colors::orangeAccent : Colors::accentActive).withAlpha (0.3f));
+            g.fillEllipse (ledX - 2.0f, ledY - 2.0f, ledSize + 4.0f, ledSize + 4.0f);
+        }
+        else
+        {
+            g.setColour (Colors::knobOutline);
+            g.drawEllipse (ledX, ledY, ledSize, ledSize, 1.0f);
+        }
+    }
+
+    // Draw labels above controls
+    g.setFont (juce::FontOptions (10.0f));
+    g.setColour (Colors::textSecondary);
+
+    auto drawLabel = [&] (const juce::String& text, const juce::Component& comp)
+    {
+        if (comp.isVisible())
+        {
+            auto b = comp.getBounds();
+            g.drawText (text, b.getX() + 2, b.getY() - 13, b.getWidth(), 12,
+                        juce::Justification::centredLeft);
+        }
+    };
+
+    if (hasMainCombo)
+    {
+        switch (channelType)
+        {
+            case ChannelType::Pulse1:
+            case ChannelType::Pulse2:     drawLabel ("DUTY", mainCombo); break;
+            case ChannelType::Noise:      drawLabel ("MODE", mainCombo); break;
+            default: break;
+        }
+    }
+
+    if (hasMainKnob)
+    {
+        auto& knob = hasMainCombo ? noisePeriodKnob : mainKnob;
+        switch (channelType)
+        {
+            case ChannelType::Noise:      drawLabel ("PERIOD", knob); break;
+            case ChannelType::Dpcm:       drawLabel ("RATE", knob); break;
+            case ChannelType::Vrc6Pulse1:
+            case ChannelType::Vrc6Pulse2: drawLabel ("DUTY", knob); break;
+            case ChannelType::Vrc6Saw:    drawLabel ("RATE", knob); break;
+            default: break;
+        }
+    }
+
+    if (hasTranspose)  drawLabel ("TRANS", transposeKnob);
+    if (hasVolume)     drawLabel ("VOL", volumeKnob);
+    drawLabel ("MIX", mixFader);
+
+    // Detail section labels
+    if (hasDetails && detailsVisible)
+    {
+        if (sweepPeriodKnob.isVisible())  drawLabel ("SW.PRD", sweepPeriodKnob);
+        if (sweepShiftKnob.isVisible())   drawLabel ("SW.SHF", sweepShiftKnob);
+        if (linearReloadKnob.isVisible()) drawLabel ("LIN.RLD", linearReloadKnob);
+    }
 }
 
 void ChannelStripComponent::resized()
 {
-    auto area = getLocalBounds().reduced (4);
-    const int pad = 2;
+    auto area = getLocalBounds().reduced (3);
+    area.removeFromTop (2);  // accent stripe clearance
+    const int pad = 3;
+    const int sliderH = 22;
+    const int labelH = 13;
 
-    // Name label
-    nameLabel.setBounds (area.removeFromTop (18));
+    // --- Layout top to bottom ---
+
+    auto nameRow = area.removeFromTop (16);
+    nameLabel.setBounds (nameRow.withTrimmedLeft (14));  // Leave space for LED
     area.removeFromTop (pad);
 
-    // Enable toggle (APU channels only, not VRC6 sub-channels)
     if (enableAttach != nullptr)
     {
-        enableToggle.setBounds (area.removeFromTop (22));
+        enableToggle.setBounds (area.removeFromTop (20));
         area.removeFromTop (pad);
     }
 
-    // Main control area (60px)
-    auto mainArea = area.removeFromTop (60);
-    if (hasMainCombo && hasMainKnob)
+    // Main combo (if any)
+    if (hasMainCombo)
     {
-        // Noise: combo on top, period knob below
-        mainCombo.setBounds (mainArea.removeFromTop (24).reduced (2, 0));
-        noisePeriodKnob.setBounds (mainArea.reduced (2, 0));
+        area.removeFromTop (labelH);
+        mainCombo.setBounds (area.removeFromTop (24).reduced (2, 0));
+        area.removeFromTop (pad);
     }
-    else if (hasMainCombo)
-    {
-        mainCombo.setBounds (mainArea.removeFromTop (24).reduced (2, 0));
-    }
-    else if (hasMainKnob)
-    {
-        mainKnob.setBounds (mainArea.reduced (2, 0));
-    }
-    else
-    {
-        mainLabel.setBounds (mainArea);
-    }
-    area.removeFromTop (pad);
 
-    // Transpose knob (melodic channels only, 36px)
+    // Main knob/slider (if any)
+    if (hasMainKnob)
+    {
+        area.removeFromTop (labelH);
+        auto& knob = hasMainCombo ? noisePeriodKnob : mainKnob;
+        knob.setBounds (area.removeFromTop (sliderH).reduced (2, 0));
+        area.removeFromTop (pad);
+    }
+    else if (! hasMainCombo)
+    {
+        mainLabel.setBounds (area.removeFromTop (16));
+        area.removeFromTop (pad);
+    }
+
+    // Transpose slider
     if (hasTranspose)
     {
-        transposeKnob.setBounds (area.removeFromTop (36).reduced (2, 0));
+        area.removeFromTop (labelH);
+        transposeKnob.setBounds (area.removeFromTop (sliderH).reduced (2, 0));
         area.removeFromTop (pad);
     }
 
-    // Volume knob (48px)
-    auto volArea = area.removeFromTop (48);
+    // Volume slider or label
     if (hasVolume)
-        volumeKnob.setBounds (volArea.reduced (2, 0));
+    {
+        area.removeFromTop (labelH);
+        volumeKnob.setBounds (area.removeFromTop (sliderH).reduced (2, 0));
+        area.removeFromTop (pad);
+    }
     else
-        volumeLabel.setBounds (volArea);
-    area.removeFromTop (pad);
+    {
+        volumeLabel.setBounds (area.removeFromTop (16));
+        area.removeFromTop (pad);
+    }
 
-    // Details toggle + details section
+    // Details toggle + expandable area
     if (hasDetails)
     {
-        detailsButton.setBounds (area.removeFromTop (22).reduced (4, 0));
+        // Align Details button across all channel types.
+        // Pulse/Noise consume 160px before this point; pad shorter channels.
+        static constexpr int targetConsumed = 160;
+        int consumed = area.getY() - (getLocalBounds().reduced (3).getY());
+        if (consumed < targetConsumed)
+            area.removeFromTop (targetConsumed - consumed);
+
+        detailsButton.setBounds (area.removeFromTop (20).reduced (4, 0));
         area.removeFromTop (pad);
 
         if (detailsVisible)
         {
-            auto detailArea = area.removeFromTop (100);
+            int detailH = juce::jmin (140, area.getHeight() - sliderH - labelH - pad);
+            detailH = juce::jmax (0, detailH);
+            auto detailArea = area.removeFromTop (detailH);
             const int rowH = 20;
 
             switch (channelType)
@@ -474,10 +604,11 @@ void ChannelStripComponent::resized()
                     constVolToggle.setBounds (detailArea.removeFromTop (rowH));
                     envLoopToggle.setBounds (detailArea.removeFromTop (rowH));
                     sweepEnableToggle.setBounds (detailArea.removeFromTop (rowH));
-                    auto sweepRow = detailArea.removeFromTop (20);
-                    sweepPeriodKnob.setBounds (sweepRow);
+                    detailArea.removeFromTop (labelH);
+                    sweepPeriodKnob.setBounds (detailArea.removeFromTop (sliderH));
                     sweepNegateToggle.setBounds (detailArea.removeFromTop (rowH));
-                    sweepShiftKnob.setBounds (detailArea);
+                    detailArea.removeFromTop (labelH);
+                    sweepShiftKnob.setBounds (detailArea.removeFromTop (sliderH));
                     break;
                 }
                 case ChannelType::Triangle:
@@ -485,7 +616,8 @@ void ChannelStripComponent::resized()
                     linearReloadKnob.setVisible (true);
                     linearControlToggle.setVisible (true);
 
-                    linearReloadKnob.setBounds (detailArea.removeFromTop (50));
+                    detailArea.removeFromTop (labelH);
+                    linearReloadKnob.setBounds (detailArea.removeFromTop (sliderH));
                     linearControlToggle.setBounds (detailArea.removeFromTop (rowH));
                     break;
                 }
@@ -504,16 +636,13 @@ void ChannelStripComponent::resized()
                     dpcmLoopToggle.setBounds (detailArea.removeFromTop (rowH));
                     break;
                 }
-                case ChannelType::Vrc6Pulse1:
-                case ChannelType::Vrc6Pulse2:
-                case ChannelType::Vrc6Saw:
+                default:
                     break;
             }
             area.removeFromTop (pad);
         }
         else
         {
-            // Hide all detail controls
             constVolToggle.setVisible (false);
             envLoopToggle.setVisible (false);
             sweepEnableToggle.setVisible (false);
@@ -526,8 +655,8 @@ void ChannelStripComponent::resized()
         }
     }
 
-    // Mix fader (fills remaining space)
-    mixFader.setBounds (area.reduced (8, 0));
+    // Mix fader — fixed height at bottom, label drawn by paint() above it
+    mixFader.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
 }
 
 } // namespace cart
