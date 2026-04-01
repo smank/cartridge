@@ -33,6 +33,7 @@ public:
 
 private:
     CartridgeProcessor& processorRef;
+    juce::AudioProcessorValueTreeState& apvtsRef;
 
     // Preset controls
     PresetComboBox presetCombo;
@@ -76,6 +77,9 @@ private:
 
     juce::ComboBox scaleCombo;
     juce::TextButton midiInfoButton { "MIDI" };
+
+    // A/B Comparison
+    juce::TextButton abButton { "A" };
 
     void populatePresets();
     void selectPreset (int index);

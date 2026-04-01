@@ -5,7 +5,7 @@ namespace cart {
 
 TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
                                   juce::AudioProcessorValueTreeState& apvts)
-    : processorRef (processor)
+    : processorRef (processor), apvtsRef (apvts)
 {
     // ─── Preset Combo ────────────────────────────────────────────────────
     presetCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
@@ -251,25 +251,67 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── MIDI Info Button ────────────────────────────────────────────────
     midiInfoButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
     midiInfoButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
-    midiInfoButton.onClick = []
+    midiInfoButton.onClick = [this]
     {
-        auto* popup = new juce::AlertWindow ("MIDI CC Mappings", "", juce::MessageBoxIconType::NoIcon);
-        popup->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
-        popup->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
-        popup->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
-        popup->addTextBlock (
+        juce::String info =
             "CC 1   Vibrato Depth\n"
             "CC 11  Master Volume\n"
             "CC 64  Sustain Pedal\n"
             "CC 71  Filter Resonance\n"
             "CC 74  Filter Cutoff\n"
             "CC 91  Reverb Mix\n"
-            "CC 93  Chorus Mix");
+            "CC 93  Chorus Mix";
+
+        // Show user CC mappings
+        static const char* ccTargetNames[] = {
+            "None", "Master Volume", "Pulse 1 Volume", "Pulse 2 Volume",
+            "Noise Volume", "VRC6 P1 Volume", "VRC6 P2 Volume",
+            "Filter Cutoff", "Filter Resonance", "Chorus Mix",
+            "Delay Mix", "Reverb Mix", "LFO Rate", "Vibrato Depth", "Tremolo Depth"
+        };
+
+        const char* ccNumIDs[] = { cart::ParamIDs::UserCC1Num, cart::ParamIDs::UserCC2Num,
+                                    cart::ParamIDs::UserCC3Num, cart::ParamIDs::UserCC4Num };
+        const char* ccTargetIDs[] = { cart::ParamIDs::UserCC1Target, cart::ParamIDs::UserCC2Target,
+                                       cart::ParamIDs::UserCC3Target, cart::ParamIDs::UserCC4Target };
+
+        bool hasUserMappings = false;
+        for (int i = 0; i < 4; ++i)
+        {
+            int target = static_cast<int> (*apvtsRef.getRawParameterValue (ccTargetIDs[i]));
+            if (target > 0 && target < 15)
+            {
+                if (!hasUserMappings)
+                {
+                    info += "\n\n--- User Mappings ---\n";
+                    hasUserMappings = true;
+                }
+                int ccNum = static_cast<int> (*apvtsRef.getRawParameterValue (ccNumIDs[i]));
+                info += "CC " + juce::String (ccNum) + "  " + ccTargetNames[target] + "\n";
+            }
+        }
+
+        auto* popup = new juce::AlertWindow ("MIDI CC Mappings", "", juce::MessageBoxIconType::NoIcon);
+        popup->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
+        popup->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
+        popup->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
+        popup->addTextBlock (info);
         popup->addButton ("OK", 0);
         popup->enterModalState (true, juce::ModalCallbackFunction::create (
             [popup] (int) { delete popup; }), false);
     };
     addAndMakeVisible (midiInfoButton);
+
+    // ─── A/B Comparison ─────────────────────────────────────────────────
+    styleBtn(abButton);
+    abButton.setColour(juce::TextButton::textColourOffId, Colors::fxBright);
+    abButton.onClick = [this]
+    {
+        processorRef.abCompare.toggle(processorRef.getApvts());
+        processorRef.triggerDspReset();
+        abButton.setButtonText(processorRef.abCompare.isShowingA() ? "A" : "B");
+    };
+    addAndMakeVisible(abButton);
 
     // Poll for DAW-initiated preset changes
     startTimerHz (4);
@@ -405,6 +447,10 @@ void TopBarComponent::timerCallback()
         presetCombo.setEngineMode (engineMode >= 1 ? engineMode - 1 : 0);
         if (onEngineToggle)
             onEngineToggle (engineMode == 2);  // 2 = Modern
+
+        bool isModern = (engineMode == 2);
+        vrc6Toggle.setEnabled (!isModern);
+        vrc6Toggle.setAlpha (isModern ? 0.4f : 1.0f);
     }
 }
 
@@ -427,16 +473,16 @@ void TopBarComponent::paint (juce::Graphics& g)
 
 void TopBarComponent::resized()
 {
-    auto bounds = getLocalBounds().reduced (6, 2);
-    int rowH = bounds.getHeight() / 2;
+    auto bounds = getLocalBounds().reduced (6, 3);
+    int rowH = bounds.getHeight() / 3;
 
-    // ─── Row 1: Preset navigation, combos, VRC6 toggle ──────────────────
-    auto row1 = bounds.removeFromTop (rowH).reduced (0, 2);
+    // ─── Row 1: Preset navigation + A/B ─────────────────────────────────
+    auto row1 = bounds.removeFromTop (rowH).reduced (0, 1);
 
     prevButton.setBounds (row1.removeFromLeft (26));
     row1.removeFromLeft (2);
     nextButton.setBounds (row1.removeFromLeft (26));
-    row1.removeFromLeft (2);
+    row1.removeFromLeft (4);
     saveButton.setBounds (row1.removeFromLeft (40));
     row1.removeFromLeft (2);
     importButton.setBounds (row1.removeFromLeft (48));
@@ -444,45 +490,52 @@ void TopBarComponent::resized()
     exportButton.setBounds (row1.removeFromLeft (48));
     row1.removeFromLeft (6);
 
-    int presetW = juce::jmin (220, row1.getWidth() / 3);
-    presetCombo.setBounds (row1.removeFromLeft (presetW));
-    row1.removeFromLeft (6);
-    panicButton.setBounds (row1.removeFromLeft (46));
-
-    // Right side
-    vrc6Toggle.setBounds (row1.removeFromRight (60));
+    // A/B and Panic on the right of row 1
+    abButton.setBounds (row1.removeFromRight (30));
     row1.removeFromRight (4);
-    engineModeCombo.setBounds (row1.removeFromRight (75));
-    row1.removeFromRight (4);
-    scaleCombo.setBounds (row1.removeFromRight (65));
-    row1.removeFromRight (4);
-    midiInfoButton.setBounds (row1.removeFromRight (42));
-    row1.removeFromRight (4);
-    midiModeCombo.setBounds (row1.removeFromRight (70));
+    panicButton.setBounds (row1.removeFromRight (46));
     row1.removeFromRight (6);
-    regionCombo.setBounds (row1.removeFromRight (65));
 
-    // ─── Row 2: Sliders ─────────────────────────────────────────────────
-    auto row2 = bounds.reduced (0, 2);
+    // Preset combo fills remaining space
+    presetCombo.setBounds (row1);
+
+    // ─── Row 2: Engine, Region, MIDI mode, VRC6, Scale, MIDI info ───────
+    auto row2 = bounds.removeFromTop (rowH).reduced (0, 1);
+
+    engineModeCombo.setBounds (row2.removeFromLeft (78));
+    row2.removeFromLeft (4);
+    regionCombo.setBounds (row2.removeFromLeft (65));
+    row2.removeFromLeft (4);
+    midiModeCombo.setBounds (row2.removeFromLeft (65));
+    row2.removeFromLeft (6);
+    vrc6Toggle.setBounds (row2.removeFromLeft (60));
+
+    // Right side of row 2
+    midiInfoButton.setBounds (row2.removeFromRight (42));
+    row2.removeFromRight (4);
+    scaleCombo.setBounds (row2.removeFromRight (65));
+
+    // ─── Row 3: Sliders ─────────────────────────────────────────────────
+    auto row3 = bounds.reduced (0, 1);
 
     int labelSpace = 28 + 34 + 26 + 34;
     int gaps = 8 * 3;
-    int sliderW = (row2.getWidth() - labelSpace - gaps) / 4;
+    int sliderW = (row3.getWidth() - labelSpace - gaps) / 4;
 
-    masterVolLabel.setBounds (row2.removeFromLeft (28));
-    masterVolSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
-    row2.removeFromLeft (8);
+    masterVolLabel.setBounds (row3.removeFromLeft (28));
+    masterVolSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
+    row3.removeFromLeft (8);
 
-    masterTuneLabel.setBounds (row2.removeFromLeft (34));
-    masterTuneSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
-    row2.removeFromLeft (8);
+    masterTuneLabel.setBounds (row3.removeFromLeft (34));
+    masterTuneSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
+    row3.removeFromLeft (8);
 
-    velocitySensLabel.setBounds (row2.removeFromLeft (26));
-    velocitySensSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
-    row2.removeFromLeft (8);
+    velocitySensLabel.setBounds (row3.removeFromLeft (26));
+    velocitySensSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
+    row3.removeFromLeft (8);
 
-    pitchBendLabel.setBounds (row2.removeFromLeft (34));
-    pitchBendSlider.setBounds (row2.removeFromLeft (juce::jmax (sliderW, 40)));
+    pitchBendLabel.setBounds (row3.removeFromLeft (34));
+    pitchBendSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
 }
 
 } // namespace cart

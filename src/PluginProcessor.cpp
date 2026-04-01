@@ -111,7 +111,21 @@ CartridgeProcessor::CartridgeProcessor()
     modOscBLevelParam    = apvts.getRawParameterValue (cart::ParamIDs::ModOscBLevel);
     modOscBDetuneParam   = apvts.getRawParameterValue (cart::ParamIDs::ModOscBDetune);
 
+    // Custom CC mapping params
+    userCC1NumParam    = apvts.getRawParameterValue(cart::ParamIDs::UserCC1Num);
+    userCC1TargetParam = apvts.getRawParameterValue(cart::ParamIDs::UserCC1Target);
+    userCC2NumParam    = apvts.getRawParameterValue(cart::ParamIDs::UserCC2Num);
+    userCC2TargetParam = apvts.getRawParameterValue(cart::ParamIDs::UserCC2Target);
+    userCC3NumParam    = apvts.getRawParameterValue(cart::ParamIDs::UserCC3Num);
+    userCC3TargetParam = apvts.getRawParameterValue(cart::ParamIDs::UserCC3Target);
+    userCC4NumParam    = apvts.getRawParameterValue(cart::ParamIDs::UserCC4Num);
+    userCC4TargetParam = apvts.getRawParameterValue(cart::ParamIDs::UserCC4Target);
+
+    tuningSystemParam = apvts.getRawParameterValue(cart::ParamIDs::TuningSystem);
+
     modernVoiceManager.setEngine (&modernEngine);
+
+    abCompare.initialize (apvts);
 
     // MIDI CC → parameter mappings
     voiceManager.onControlChange = [this] (int cc, float value01)
@@ -127,6 +141,55 @@ CartridgeProcessor::CartridgeProcessor()
             if (auto* p = apvts.getParameter (paramID))
                 p->setValueNotifyingHost (p->convertTo0to1 (v));
         };
+
+        // Check user CC mappings first
+        auto checkUserCC = [&](std::atomic<float>* numParam, std::atomic<float>* targetParam)
+        {
+            int ccNum = static_cast<int>(*numParam);
+            int target = static_cast<int>(*targetParam);
+            if (ccNum == cc && target > 0)
+            {
+                // Map target index to parameter ID and apply
+                static const char* targetParams[] = {
+                    nullptr,                          // 0 = None
+                    cart::ParamIDs::MasterVolume,     // 1
+                    cart::ParamIDs::P1Volume,         // 2
+                    cart::ParamIDs::P2Volume,         // 3
+                    cart::ParamIDs::NoiseVolume,      // 4
+                    cart::ParamIDs::Vrc6P1Volume,     // 5
+                    cart::ParamIDs::Vrc6P2Volume,     // 6
+                    cart::ParamIDs::FltCutoff,        // 7
+                    cart::ParamIDs::FltResonance,     // 8
+                    cart::ParamIDs::ChMix,            // 9
+                    cart::ParamIDs::DlMix,            // 10
+                    cart::ParamIDs::RvMix,            // 11
+                    cart::ParamIDs::LfoRate,          // 12
+                    cart::ParamIDs::LfoVibratoDepth,  // 13
+                    cart::ParamIDs::LfoTremoloDepth   // 14
+                };
+                if (target < 15 && targetParams[target] != nullptr)
+                {
+                    // For volume params (int 0-15), scale appropriately
+                    if (target >= 2 && target <= 6)
+                        setNormRange(targetParams[target], value01 * 15.0f);
+                    // For filter cutoff (20-20000 Hz, log scale)
+                    else if (target == 7)
+                        setNormRange(targetParams[target], 20.0f * std::pow(1000.0f, value01));
+                    // For filter resonance (0.1-5.0)
+                    else if (target == 8)
+                        setNormRange(targetParams[target], 0.1f + value01 * 4.9f);
+                    else
+                        setNorm(targetParams[target], value01);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        if (checkUserCC(userCC1NumParam, userCC1TargetParam)) return;
+        if (checkUserCC(userCC2NumParam, userCC2TargetParam)) return;
+        if (checkUserCC(userCC3NumParam, userCC3TargetParam)) return;
+        if (checkUserCC(userCC4NumParam, userCC4TargetParam)) return;
 
         switch (cc)
         {
@@ -186,6 +249,7 @@ void CartridgeProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     lfo.setSampleRate (sampleRate);
     // DC blocker state intentionally preserved — resetting to 0 causes a settling
     // transient.  Member initializers handle the very first startup.
+    waveformBuffer.reset();
     cachedParams = CachedParams{};   // Force full re-apply after APU reset
     fadeInSamplesRemaining = 1024;   // Suppress startup transient (covers DC blocker settling)
 }
@@ -314,7 +378,7 @@ void CartridgeProcessor::updateDspFromParameters()
 
     // Load selected DPCM sample
     if (changed (cachedParams.dpcmSample, *dpcmSampleParam))
-        apu.dpcm().loadSample (cart::getDpcmSample (static_cast<int> (cachedParams.dpcmSample)));
+        apu.dpcm().loadSample (dpcmSampleManager.getSample (static_cast<int> (cachedParams.dpcmSample)));
 
     // VRC6 Expansion
     float vrc6Val = *vrc6EnabledParam;
@@ -395,6 +459,21 @@ void CartridgeProcessor::updateDspFromParameters()
     lfo.setRate (*lfoRateParam);
     lfo.setVibratoDepth (*lfoVibratoDepthParam);
     lfo.setTremoloDepth (*lfoTremoloDepthParam);
+
+    // Tuning system
+    if (changed(cachedParams.tuningSystem, *tuningSystemParam))
+    {
+        switch (static_cast<int>(cachedParams.tuningSystem))
+        {
+            case 0: tuningTable.makeEqual(); break;
+            case 1: tuningTable.makeJust(); break;
+            case 2: tuningTable.makePythagorean(); break;
+            case 3: tuningTable.makeMeantone(); break;
+            default: tuningTable.makeEqual(); break;
+        }
+        voiceManager.setTuningTable(&tuningTable);
+        modernVoiceManager.setTuningTable(&tuningTable);
+    }
 
     // Pass channel enabled state for Auto mode routing
     voiceManager.setChannelEnabled (0, cachedParams.p1Enabled > 0.5f);
@@ -576,7 +655,22 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         dcBlockX = out;
         dcBlockY = dcOut;
 
+        waveformBuffer.write (dcOut);
+
         buffer.setSample (0, sample, dcOut);
+    }
+
+    // Update per-channel activity flags (once per block)
+    if (usingModernEngine)
+    {
+        // Modern engine: no per-channel info, clear all
+        for (int i = 0; i < 8; ++i)
+            channelActive[i].store (false, std::memory_order_relaxed);
+    }
+    else
+    {
+        for (int i = 0; i < 8; ++i)
+            channelActive[i].store (voiceManager.isChannelActive (i), std::memory_order_relaxed);
     }
 
     // Fade-in ramp BEFORE effects — prevents transients from being stored in
@@ -622,6 +716,7 @@ void CartridgeProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    dpcmSampleManager.saveToXml (*xml);
     copyXmlToBinary (*xml, destData);
 }
 
@@ -630,6 +725,7 @@ void CartridgeProcessor::setStateInformation (const void* data, int sizeInBytes)
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
     if (xmlState != nullptr && xmlState->hasTagName (apvts.state.getType()))
     {
+        dpcmSampleManager.loadFromXml (*xmlState);
         apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
         pendingDspReset.store (true);        // Actual reset deferred to audio thread
     }
