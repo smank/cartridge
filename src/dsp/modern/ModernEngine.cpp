@@ -15,6 +15,8 @@ void ModernEngine::reset()
 {
     for (auto& v : voices)
         v.reset();
+    for (auto& ch : voiceMidiChannel)
+        ch = 0;
     pitchBendMult = 1.0f;
 }
 
@@ -102,7 +104,7 @@ void ModernEngine::setMasterVolume (float vol)
     masterVolume = vol;
 }
 
-void ModernEngine::noteOn (int note, float velocity, float freqHz)
+int ModernEngine::noteOn (int note, float velocity, float freqHz)
 {
     // Apply pitch bend to frequency
     float finalFreq = freqHz * pitchBendMult;
@@ -112,7 +114,7 @@ void ModernEngine::noteOn (int note, float velocity, float freqHz)
     if (idx >= 0)
     {
         voices[idx].noteOn (note, velocity, finalFreq);
-        return;
+        return idx;
     }
 
     // 2. Find a free voice
@@ -120,7 +122,7 @@ void ModernEngine::noteOn (int note, float velocity, float freqHz)
     if (idx >= 0)
     {
         voices[idx].noteOn (note, velocity, finalFreq);
-        return;
+        return idx;
     }
 
     // 3. Steal oldest releasing voice
@@ -128,7 +130,7 @@ void ModernEngine::noteOn (int note, float velocity, float freqHz)
     if (idx >= 0)
     {
         voices[idx].noteOn (note, velocity, finalFreq);
-        return;
+        return idx;
     }
 
     // 4. Steal oldest active voice
@@ -137,6 +139,7 @@ void ModernEngine::noteOn (int note, float velocity, float freqHz)
     {
         voices[idx].noteOn (note, velocity, finalFreq);
     }
+    return idx;
 }
 
 void ModernEngine::noteOff (int note)
@@ -146,6 +149,12 @@ void ModernEngine::noteOff (int note)
         if (voices[i].isActive() && voices[i].getNote() == note)
             voices[i].noteOff();
     }
+}
+
+void ModernEngine::noteOffByIndex (int voiceIndex)
+{
+    if (voiceIndex >= 0 && voiceIndex < maxVoiceCount && voices[voiceIndex].isActive())
+        voices[voiceIndex].noteOff();
 }
 
 void ModernEngine::allNotesOff()
@@ -244,6 +253,70 @@ int ModernEngine::findOldestActiveVoice() const
         }
     }
     return oldest;
+}
+
+// --- MPE per-voice methods ---
+
+void ModernEngine::setPerVoicePitchBend (int voiceIndex, float semitones)
+{
+    if (voiceIndex >= 0 && voiceIndex < maxVoiceCount)
+    {
+        float mult = std::pow (2.0f, semitones / 12.0f);
+        voices[voiceIndex].setPitchBendMultiplier (mult);
+    }
+}
+
+void ModernEngine::setPerVoiceSlide (int voiceIndex, float value01)
+{
+    if (voiceIndex >= 0 && voiceIndex < maxVoiceCount)
+    {
+        voices[voiceIndex].setMpeSlide (value01);
+        // TODO: Route slide to a filter cutoff or timbre parameter when available
+    }
+}
+
+void ModernEngine::setPerVoicePressure (int voiceIndex, float value01)
+{
+    if (voiceIndex >= 0 && voiceIndex < maxVoiceCount)
+    {
+        voices[voiceIndex].setMpePressure (value01);
+        // TODO: Route pressure to volume/expression modulation when available
+    }
+}
+
+void ModernEngine::setVoiceMidiChannel (int voiceIndex, int midiChannel)
+{
+    if (voiceIndex >= 0 && voiceIndex < maxVoiceCount)
+        voiceMidiChannel[voiceIndex] = midiChannel;
+}
+
+int ModernEngine::getVoiceMidiChannel (int voiceIndex) const
+{
+    if (voiceIndex >= 0 && voiceIndex < maxVoiceCount)
+        return voiceMidiChannel[voiceIndex];
+    return 0;
+}
+
+int ModernEngine::findVoiceForChannel (int midiChannel) const
+{
+    for (int i = 0; i < maxVoices; ++i)
+    {
+        if (voices[i].isActive() && !voices[i].isReleasing()
+            && voiceMidiChannel[i] == midiChannel)
+            return i;
+    }
+    return -1;
+}
+
+int ModernEngine::findVoiceForNoteAndChannel (int note, int midiChannel) const
+{
+    for (int i = 0; i < maxVoices; ++i)
+    {
+        if (voices[i].isActive() && voices[i].getNote() == note
+            && voiceMidiChannel[i] == midiChannel)
+            return i;
+    }
+    return -1;
 }
 
 } // namespace cart

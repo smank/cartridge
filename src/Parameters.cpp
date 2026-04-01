@@ -119,9 +119,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
         juce::ParameterID { ParamIDs::DpcmMix, 1 }, "DPCM Mix",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 1.0f));
 
-    params.push_back (std::make_unique<juce::AudioParameterChoice> (
-        juce::ParameterID { ParamIDs::DpcmSample, 1 }, "DPCM Sample",
-        juce::StringArray { "Kick", "Snare", "Hi-Hat", "Tom" }, 0));
+    {
+        juce::StringArray dpcmSampleNames { "Kick", "Snare", "Hi-Hat", "Tom" };
+        for (int i = 0; i < 16; ++i)
+            dpcmSampleNames.add("User " + juce::String(i + 1));
+
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            juce::ParameterID { ParamIDs::DpcmSample, 1 }, "DPCM Sample",
+            dpcmSampleNames, 0));
+    }
 
     // ─── VRC6 Expansion ──────────────────────────────────────────────────
     params.push_back (std::make_unique<juce::AudioParameterBool> (
@@ -411,6 +417,34 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { ParamIDs::RvMix, 1 }, "Reverb Mix",
         juce::NormalisableRange<float> (0.0f, 1.0f, 0.01f), 0.2f));
+
+    // ─── Custom CC Mappings ─────────────────────────────────────────────
+    // Target choices: 0=None, 1=MasterVolume, 2=P1Volume, 3=P2Volume, 4=NoiseVolume,
+    // 5=Vrc6P1Volume, 6=Vrc6P2Volume, 7=FilterCutoff, 8=FilterResonance,
+    // 9=ChorusMix, 10=DelayMix, 11=ReverbMix, 12=LfoRate, 13=VibratoDepth, 14=TremoloDepth
+    juce::StringArray ccTargets { "None", "Master Volume", "Pulse 1 Volume", "Pulse 2 Volume",
+                                   "Noise Volume", "VRC6 P1 Volume", "VRC6 P2 Volume",
+                                   "Filter Cutoff", "Filter Resonance", "Chorus Mix",
+                                   "Delay Mix", "Reverb Mix", "LFO Rate", "Vibrato Depth", "Tremolo Depth" };
+
+    for (int i = 1; i <= 4; ++i)
+    {
+        juce::String num = juce::String(i);
+        params.push_back(std::make_unique<juce::AudioParameterInt>(
+            juce::ParameterID { juce::String("userCC") + num + "Num", 1 },
+            "User CC " + num + " Number", 0, 127, 0));
+
+        params.push_back(std::make_unique<juce::AudioParameterChoice>(
+            juce::ParameterID { juce::String("userCC") + num + "Target", 1 },
+            "User CC " + num + " Target", ccTargets, 0));
+    }
+
+    // ─── Tuning System ──────────────────────────────────────────────────
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID { ParamIDs::TuningSystem, 1 },
+        "Tuning System",
+        juce::StringArray { "Equal", "Just", "Pythagorean", "Meantone" },
+        0));
 
     return { params.begin(), params.end() };
 }

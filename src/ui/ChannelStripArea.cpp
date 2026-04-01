@@ -25,6 +25,18 @@ ChannelStripArea::ChannelStripArea (juce::AudioProcessorValueTreeState& apvts)
 
 ChannelStripArea::~ChannelStripArea() = default;
 
+void ChannelStripArea::setActivityFlags (std::atomic<bool>* flags)
+{
+    pulse1Strip.setActivityFlag     (&flags[0]);
+    pulse2Strip.setActivityFlag     (&flags[1]);
+    triangleStrip.setActivityFlag   (&flags[2]);
+    noiseStrip.setActivityFlag      (&flags[3]);
+    dpcmStrip.setActivityFlag       (&flags[4]);
+    vrc6Pulse1Strip.setActivityFlag (&flags[5]);
+    vrc6Pulse2Strip.setActivityFlag (&flags[6]);
+    vrc6SawStrip.setActivityFlag    (&flags[7]);
+}
+
 void ChannelStripArea::setVrc6Visible (bool visible)
 {
     if (vrc6Visible == visible)
@@ -58,7 +70,7 @@ void ChannelStripArea::paint (juce::Graphics& g)
 
 void ChannelStripArea::resized()
 {
-    auto area = getLocalBounds().reduced (2);
+    auto area = getLocalBounds().reduced (4, 4);
     const int pad = 2;
 
     if (vrc6Visible)

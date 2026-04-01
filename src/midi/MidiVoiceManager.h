@@ -3,6 +3,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "../dsp/Apu.h"
 #include "../dsp/Portamento.h"
+#include "TuningTable.h"
 #include <functional>
 
 namespace cart {
@@ -46,6 +47,9 @@ public:
     /// Set the fallback DPCM sample index (used when note mapping returns -1)
     void setDpcmSample (int idx) { dpcmSampleParam = idx; }
 
+    /// Set the tuning table for microtuning support
+    void setTuningTable (TuningTable* table) { tuningTablePtr = table; }
+
     /// Process a single MIDI message
     void processMidiMessage (const juce::MidiMessage& msg);
 
@@ -60,6 +64,9 @@ public:
 
     /// Clear all active notes (call on preset change)
     void handleAllNotesOff();
+
+    /// Check if a channel is currently playing a note
+    bool isChannelActive (int ch) const { return ch >= 0 && ch < 8 && activeNotes[ch] >= 0; }
 
     /// Callback for MIDI CC messages (ccNumber, value01)
     std::function<void(int, float)> onControlChange;
@@ -84,6 +91,7 @@ private:
 
     float     transpose[8]        = {};   // Semitones per NES channel
     int       dpcmSampleParam     = 0;    // Fallback DPCM sample index
+    TuningTable* tuningTablePtr   = nullptr;
 
     // Per-channel state for pitch bend
     float     pitchBendValues[16] = {};   // Normalized -1 to 1

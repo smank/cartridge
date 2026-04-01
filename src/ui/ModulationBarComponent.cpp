@@ -97,7 +97,12 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     addChildComponent (arpGateLabel);
 
     // ─── DPCM ───────────────────────────────────────────────────────────
-    dpcmSample.addItemList ({ "Kick", "Snare", "Hi-Hat", "Tom" }, 1);
+    {
+        juce::StringArray dpcmNames { "Kick", "Snare", "Hi-Hat", "Tom" };
+        for (int i = 0; i < 16; ++i)
+            dpcmNames.add ("User " + juce::String (i + 1));
+        dpcmSample.addItemList (dpcmNames, 1);
+    }
     dpcmSample.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     dpcmSample.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     dpcmSample.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -106,6 +111,27 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
         apvts, ParamIDs::DpcmSample, dpcmSample);
     makeKnobLabel (dpcmSampleLabel, "Sample");
     addChildComponent (dpcmSampleLabel);
+
+    // DPCM Load button
+    dpcmLoadButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
+    dpcmLoadButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    dpcmLoadButton.onClick = [this]
+    {
+        dpcmFileChooser = std::make_shared<juce::FileChooser> (
+            "Load DPCM Sample",
+            juce::File::getSpecialLocation (juce::File::userDesktopDirectory),
+            "*.dmc;*.wav");
+
+        dpcmFileChooser->launchAsync (
+            juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+            [this] (const juce::FileChooser& fc)
+            {
+                auto file = fc.getResult();
+                if (file.existsAsFile() && onDpcmLoad)
+                    onDpcmLoad (file);
+            });
+    };
+    addChildComponent (dpcmLoadButton);
 
     startTimerHz (15);
 }
@@ -171,7 +197,7 @@ void ModulationBarComponent::setDetailVisible (int modIndex, bool visible)
             setVis ({ &arpPattern, &arpRate, &arpOctaves, &arpGate, &arpPatternLabel, &arpRateLabel, &arpOctavesLabel, &arpGateLabel });
             break;
         case MOD_DPCM:
-            setVis ({ &dpcmSample, &dpcmSampleLabel });
+            setVis ({ &dpcmSample, &dpcmSampleLabel, &dpcmLoadButton });
             break;
         default: break;
     }
@@ -354,11 +380,13 @@ void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int m
         }
         case MOD_DPCM:
         {
-            // Center the combo box
-            auto comboCol = area.withSizeKeepingCentre (area.getWidth() / 3, area.getHeight());
+            auto comboCol = area.withSizeKeepingCentre (area.getWidth() / 2, area.getHeight());
             dpcmSampleLabel.setBounds (comboCol.removeFromTop (labelH));
-            int cw = juce::jmax (80, comboCol.getWidth() - 12);
-            dpcmSample.setBounds (comboCol.withSizeKeepingCentre (cw, comboH));
+            auto row = comboCol.removeFromTop (comboH + 4);
+            int cw = juce::jmax (80, row.getWidth() - 60);
+            dpcmSample.setBounds (row.removeFromLeft (cw));
+            row.removeFromLeft (4);
+            dpcmLoadButton.setBounds (row.removeFromLeft (50).withHeight (comboH));
             break;
         }
         default: break;

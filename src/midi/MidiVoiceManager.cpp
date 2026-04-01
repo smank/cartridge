@@ -10,6 +10,8 @@ float MidiVoiceManager::getAdjustedFrequency (int note, float bendSemitones, int
 {
     float transposeOffset = (nesChannel >= 0 && nesChannel < 8) ? transpose[nesChannel] : 0.0f;
     float adjustedNote = static_cast<float> (note) + bendSemitones + transposeOffset + (masterTuneCents / 100.0f);
+    if (tuningTablePtr != nullptr)
+        return tuningTablePtr->getFrequency (adjustedNote);
     return midiNoteToFrequency (adjustedNote);
 }
 
@@ -432,7 +434,9 @@ void MidiVoiceManager::applyPitchMultiplier (float multiplier)
     {
         if (activeNotes[i] < 0) continue;
 
-        float freq = midiNoteToFrequency (static_cast<float> (activeNotes[i]) + transpose[i] + masterTuneCents / 100.0f) * multiplier;
+        float adjustedNote = static_cast<float> (activeNotes[i]) + transpose[i] + masterTuneCents / 100.0f;
+        float baseFreq = tuningTablePtr != nullptr ? tuningTablePtr->getFrequency (adjustedNote) : midiNoteToFrequency (adjustedNote);
+        float freq = baseFreq * multiplier;
 
         switch (i)
         {
