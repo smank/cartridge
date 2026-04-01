@@ -741,6 +741,27 @@ void PresetManager::buildPresets()
         { ParamIDs::RvMix,            0.45f },
     }));
 
+    // 30. Surface Tension — Overworld action theme
+    presets.push_back (makePreset ("Surface Tension", {
+        { ParamIDs::P1Duty,           1.0f },   // 25%
+        { ParamIDs::P1Volume,         15.0f },
+        { ParamIDs::P2Enabled,        1.0f },
+        { ParamIDs::P2Duty,           2.0f },   // 50%
+        { ParamIDs::P2Volume,         12.0f },
+        { ParamIDs::TriEnabled,       1.0f },
+        { ParamIDs::NoiseEnabled,     1.0f },
+        { ParamIDs::NoisePeriod,      5.0f },
+        { ParamIDs::NoiseVolume,      15.0f },
+        { ParamIDs::NoiseConstVol,    0.0f },   // Envelope decay
+        { ParamIDs::Vrc6Enabled,      1.0f },
+        { ParamIDs::Vrc6P1Mix,        0.0f },   // Mute VRC6 Pulse 1
+        { ParamIDs::Vrc6P2Mix,        0.0f },   // Mute VRC6 Pulse 2
+        { ParamIDs::Vrc6SawRate,      42.0f },  // Saw bass
+        { ParamIDs::Vrc6SawMix,       1.0f },
+        { ParamIDs::VelocitySens,     0.4f },
+        { ParamIDs::MidiMode,         0.0f },   // Split
+    }));
+
     // ═══════════════════════════════════════════════════════════════════════
     //  MODERN ENGINE (31–35)
     // ═══════════════════════════════════════════════════════════════════════
@@ -841,26 +862,6 @@ void PresetManager::buildPresets()
         { ParamIDs::RvMix,            0.4f },
     }));
 
-    // 30. Surface Tension — Overworld action theme
-    presets.push_back (makePreset ("Surface Tension", {
-        { ParamIDs::P1Duty,           1.0f },   // 25%
-        { ParamIDs::P1Volume,         15.0f },
-        { ParamIDs::P2Enabled,        1.0f },
-        { ParamIDs::P2Duty,           2.0f },   // 50%
-        { ParamIDs::P2Volume,         12.0f },
-        { ParamIDs::TriEnabled,       1.0f },
-        { ParamIDs::NoiseEnabled,     1.0f },
-        { ParamIDs::NoisePeriod,      5.0f },
-        { ParamIDs::NoiseVolume,      15.0f },
-        { ParamIDs::NoiseConstVol,    0.0f },   // Envelope decay
-        { ParamIDs::Vrc6Enabled,      1.0f },
-        { ParamIDs::Vrc6P1Mix,        0.0f },   // Mute VRC6 Pulse 1
-        { ParamIDs::Vrc6P2Mix,        0.0f },   // Mute VRC6 Pulse 2
-        { ParamIDs::Vrc6SawRate,      42.0f },  // Saw bass
-        { ParamIDs::Vrc6SawMix,       1.0f },
-        { ParamIDs::VelocitySens,     0.4f },
-        { ParamIDs::MidiMode,         0.0f },   // Split
-    }));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1024,6 +1025,19 @@ const Preset* PresetManager::getPreset (int index) const
     if (index >= 0 && index < static_cast<int> (presets.size()))
         return &presets[static_cast<size_t> (index)];
     return nullptr;
+}
+
+int PresetManager::getPresetEngineMode (int index) const
+{
+    if (auto* p = getPreset (index))
+    {
+        for (const auto& [paramID, value] : p->values)
+        {
+            if (paramID == ParamIDs::EngineMode)
+                return value >= 0.5f ? 1 : 0;
+        }
+    }
+    return 0;  // Default to Classic
 }
 
 } // namespace cart

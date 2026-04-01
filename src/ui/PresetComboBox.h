@@ -24,25 +24,42 @@ public:
 
     void setUserCategories (std::vector<UserCategory> cats) { userCategories = std::move (cats); }
 
+    /// Set the current engine mode for filtering (0=Classic, 1=Modern)
+    void setEngineMode (int mode) { currentEngineMode = mode; }
+
+    /// Set engine mode per factory preset index (0=Classic, 1=Modern)
+    void setPresetEngineModes (std::vector<int> modes) { presetEngineModes = std::move (modes); }
+
+    /// Returns true if the factory preset at the given index matches the current engine mode
+    bool isPresetVisibleForMode (int presetIndex) const
+    {
+        if (presetIndex < 0 || presetIndex >= static_cast<int> (presetEngineModes.size()))
+            return true;  // User presets or out of range — always visible
+        return presetEngineModes[static_cast<size_t> (presetIndex)] == currentEngineMode;
+    }
+
     void showPopup() override
     {
         juce::PopupMenu menu;
 
         // Category ranges matching PresetManager::buildPresets() order
-        struct Category { const char* name; int start; int end; bool columnBreak; };
+        // Classic presets: 0-29, Modern presets: 30-34
+        struct Category { const char* name; int start; int end; bool columnBreak; int engineMode; };
         const Category categories[] = {
-            { "INIT",              0,  0, false },
-            { "LEADS",             1,  5, false },
-            { "BASS",              6,  8, false },
+            { "INIT",              0,  0, false, 0 },
+            { "LEADS",             1,  5, false, 0 },
+            { "BASS",              6,  8, false, 0 },
             //--- column 2 ---
-            { "PERCUSSION",        9, 12, true  },
-            { "SFX",              13, 15, false },
-            { "FULL SETUPS",      16, 18, false },
+            { "PERCUSSION",        9, 12, true,  0 },
+            { "SFX",              13, 15, false, 0 },
+            { "FULL SETUPS",      16, 18, false, 0 },
             //--- column 3 ---
-            { "WITH EFFECTS",     19, 20, true  },
-            { "ARP & SHOWCASE",   21, 24, false },
+            { "WITH EFFECTS",     19, 20, true,  0 },
+            { "ARP & SHOWCASE",   21, 24, false, 0 },
             //--- column 4 ---
-            { "GAME INSPIRED",    25, 29, true  },
+            { "GAME INSPIRED",    25, 29, true,  0 },
+            //--- Modern Engine ---
+            { "MODERN ENGINE",    30, 34, true,  1 },
         };
 
         int numItems = getNumItems();
@@ -51,6 +68,10 @@ public:
         for (const auto& cat : categories)
         {
             if (cat.start >= numItems) break;
+
+            // Skip entire categories that don't match current engine mode
+            if (cat.engineMode != currentEngineMode)
+                continue;
 
             if (cat.columnBreak)
                 menu.addColumnBreak();
@@ -65,7 +86,7 @@ public:
             }
         }
 
-        // User presets — organized by category
+        // User presets — always visible in both modes, organized by category
         if (factoryPresetCount > 0 && numItems > factoryPresetCount)
         {
             bool needsColumnBreak = true;
@@ -126,6 +147,8 @@ public:
 
 private:
     int factoryPresetCount = 0;
+    int currentEngineMode = 0;  // 0=Classic, 1=Modern
+    std::vector<int> presetEngineModes;
     std::vector<UserCategory> userCategories;
 };
 

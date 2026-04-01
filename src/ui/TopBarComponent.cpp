@@ -24,18 +24,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     styleBtn (prevButton);
     styleBtn (nextButton);
 
-    prevButton.onClick = [this]
-    {
-        int cur = processorRef.getCurrentProgram();
-        int total = processorRef.getNumPrograms();
-        selectPreset ((cur - 1 + total) % total);
-    };
-    nextButton.onClick = [this]
-    {
-        int cur = processorRef.getCurrentProgram();
-        int total = processorRef.getNumPrograms();
-        selectPreset ((cur + 1) % total);
-    };
+    prevButton.onClick = [this] { navigatePreset (-1); };
+    nextButton.onClick = [this] { navigatePreset (1); };
     addAndMakeVisible (prevButton);
     addAndMakeVisible (nextButton);
 
@@ -293,11 +283,26 @@ TopBarComponent::~TopBarComponent()
 void TopBarComponent::populatePresets()
 {
     presetCombo.clear (juce::dontSendNotification);
+    auto& pm = processorRef.getPresetManager();
     int numPresets = processorRef.getNumPrograms();
+
     for (int i = 0; i < numPresets; ++i)
         presetCombo.addItem (processorRef.getProgramName (i), i + 1);
 
-    presetCombo.setFactoryPresetCount (processorRef.getPresetManager().getFactoryPresetCount());
+    presetCombo.setFactoryPresetCount (pm.getFactoryPresetCount());
+
+    // Build engine mode vector for factory presets
+    int factoryCount = pm.getFactoryPresetCount();
+    std::vector<int> modes;
+    modes.reserve (static_cast<size_t> (factoryCount));
+    for (int i = 0; i < factoryCount; ++i)
+        modes.push_back (pm.getPresetEngineMode (i));
+    presetCombo.setPresetEngineModes (std::move (modes));
+
+    // Set current engine mode on combo
+    int engineMode = engineModeCombo.getSelectedId();
+    presetCombo.setEngineMode (engineMode >= 1 ? engineMode - 1 : 0);
+
     refreshUserCategories();
     presetCombo.setSelectedId (processorRef.getCurrentProgram() + 1, juce::dontSendNotification);
 }
@@ -359,7 +364,17 @@ void TopBarComponent::navigatePreset (int delta)
 {
     int cur = processorRef.getCurrentProgram();
     int total = processorRef.getNumPrograms();
-    selectPreset ((cur + delta + total) % total);
+
+    // Skip presets that don't match the current engine mode
+    for (int attempt = 0; attempt < total; ++attempt)
+    {
+        cur = (cur + delta + total) % total;
+        if (presetCombo.isPresetVisibleForMode (cur))
+        {
+            selectPreset (cur);
+            return;
+        }
+    }
 }
 
 void TopBarComponent::timerCallback()
@@ -387,6 +402,7 @@ void TopBarComponent::timerCallback()
     if (engineMode != lastEngineMode)
     {
         lastEngineMode = engineMode;
+        presetCombo.setEngineMode (engineMode >= 1 ? engineMode - 1 : 0);
         if (onEngineToggle)
             onEngineToggle (engineMode == 2);  // 2 = Modern
     }

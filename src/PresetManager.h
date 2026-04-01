@@ -52,6 +52,9 @@ public:
     /// Get the Preset struct at index (for category info)
     const Preset* getPreset (int index) const;
 
+    /// Returns 0 for Classic, 1 for Modern engine mode preset
+    int getPresetEngineMode (int index) const;
+
 private:
     void buildPresets();
 
