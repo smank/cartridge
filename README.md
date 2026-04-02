@@ -1,6 +1,6 @@
 # Cartridge
 
-Chiptune synthesizer plugin emulating the NES 2A03 APU with optional VRC6 expansion. Available as VST3, AU, CLAP, and Standalone.
+Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 expansion. Available as VST3, AU, CLAP, and Standalone.
 
 ## Features
 
