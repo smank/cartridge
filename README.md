@@ -9,7 +9,7 @@ Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 expa
 - **Triangle channel** — 32-step waveform, linear counter
 - **Noise channel** — 15-bit LFSR, long/short mode, 16 period presets (NTSC/PAL), envelope generator
 - **DPCM channel** — 4 built-in samples (Kick, Snare, Hi-Hat, Tom) + 16 user sample slots (.wav import)
-- **VRC6 Konami expansion** — 2 Pulse (8-level duty), 1 Sawtooth (accumulator-based), toggleable
+- **VRC6 Konami expansion** - 2 Pulse (8-level duty), 1 Sawtooth (accumulator-based), toggleable
 - **Nonlinear NES DAC mixing** — authentic lookup tables matching hardware output curves
 
 ### Modern Engine
@@ -65,7 +65,7 @@ Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 expa
 ## Keyboard Shortcuts
 
 | Key | Action |
-|-----|--------|
+|---|----|
 | `1`–`5` | Toggle APU channels (Pulse 1/2, Triangle, Noise, DPCM) |
 | `6`–`8` | Toggle VRC6 channels (Pulse 1/2, Sawtooth) |
 | `Left` / `Right` | Navigate presets |
@@ -85,10 +85,10 @@ Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 expa
 Requires CMake 3.22+, a C++17 compiler, and Git. Uses [JUCE 8](https://juce.com/) and [clap-juce-extensions](https://github.com/free-audio/clap-juce-extensions) as submodules.
 
 ```bash
-git clone --recursive https://github.com/smank/cartridge.git
+git clone -recursive https://github.com/smank/cartridge.git
 cd cartridge
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
+cmake -build build -config Release
 ```
 
 Artifacts land in `build/Cartridge_artefacts/Release/{AU,CLAP,Standalone,VST3}`.
