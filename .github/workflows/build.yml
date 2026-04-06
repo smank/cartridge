@@ -41,10 +41,13 @@ jobs:
           libcurl4-openssl-dev
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCARTRIDGE_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Run Tests
+        run: cd build && ctest --output-on-failure -C Release
 
       - name: Upload VST3
         uses: actions/upload-artifact@v7
