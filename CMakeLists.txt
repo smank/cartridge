@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 if(APPLE)
-    project(Cartridge VERSION 1.7.1 LANGUAGES C CXX OBJC OBJCXX)
+    project(Cartridge VERSION 1.7.2 LANGUAGES C CXX OBJC OBJCXX)
 else()
-    project(Cartridge VERSION 1.7.1 LANGUAGES C CXX)
+    project(Cartridge VERSION 1.7.2 LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
