@@ -24,6 +24,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     lfoEnable.setSize (0, 0);
 
     styleKnob (lfoRate);
+    lfoRate.setTooltip ("LFO rate in Hz");
     addChildComponent (lfoRate);
     lfoRateAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::LfoRate, lfoRate);
@@ -31,6 +32,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     addChildComponent (lfoRateLabel);
 
     styleKnob (lfoVibrato);
+    lfoVibrato.setTooltip ("Vibrato depth (pitch modulation)");
     addChildComponent (lfoVibrato);
     lfoVibratoAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::LfoVibratoDepth, lfoVibrato);
@@ -38,6 +40,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     addChildComponent (lfoVibratoLabel);
 
     styleKnob (lfoTremolo);
+    lfoTremolo.setTooltip ("Tremolo depth (volume modulation)");
     addChildComponent (lfoTremolo);
     lfoTremoloAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::LfoTremoloDepth, lfoTremolo);
@@ -52,6 +55,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     portaEnable.setSize (0, 0);
 
     styleKnob (portaTime);
+    portaTime.setTooltip ("Portamento glide time in seconds");
     addChildComponent (portaTime);
     portaTimeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::PortaTime, portaTime);
@@ -66,6 +70,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     arpEnable.setSize (0, 0);
 
     arpPattern.addItemList ({ "Up", "Down", "Up-Down", "Random", "As Played" }, 1);
+    arpPattern.setTooltip ("Arpeggiator note order pattern");
     arpPattern.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     arpPattern.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     arpPattern.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -76,6 +81,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     addChildComponent (arpPatternLabel);
 
     styleKnob (arpRate);
+    arpRate.setTooltip ("Arpeggiator speed in Hz");
     addChildComponent (arpRate);
     arpRateAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::ArpRate, arpRate);
@@ -83,6 +89,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     addChildComponent (arpRateLabel);
 
     styleKnob (arpOctaves);
+    arpOctaves.setTooltip ("Arpeggiator octave range (1-4)");
     addChildComponent (arpOctaves);
     arpOctavesAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::ArpOctaves, arpOctaves);
@@ -90,11 +97,30 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     addChildComponent (arpOctavesLabel);
 
     styleKnob (arpGate);
+    arpGate.setTooltip ("Arpeggiator gate length (note duration)");
     addChildComponent (arpGate);
     arpGateAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::ArpGate, arpGate);
     makeKnobLabel (arpGateLabel, "Gate");
     addChildComponent (arpGateLabel);
+
+    // Arp tempo sync
+    arpSyncToggle.setButtonText ("Sync");
+    arpSyncToggle.setColour (juce::ToggleButton::textColourId, Colors::textSecondary);
+    arpSyncToggle.setColour (juce::ToggleButton::tickColourId, Colors::accentActive);
+    arpSyncToggle.setTooltip ("Sync arp rate to host tempo");
+    addChildComponent (arpSyncToggle);
+    arpSyncAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        apvts, ParamIDs::ArpSyncEnabled, arpSyncToggle);
+
+    arpSyncDiv.addItemList ({ "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T" }, 1);
+    arpSyncDiv.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
+    arpSyncDiv.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
+    arpSyncDiv.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    arpSyncDiv.setTooltip ("Arp tempo sync note division");
+    addChildComponent (arpSyncDiv);
+    arpSyncDivAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
+        apvts, ParamIDs::ArpSyncDiv, arpSyncDiv);
 
     // ─── DPCM ───────────────────────────────────────────────────────────
     {
@@ -103,6 +129,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
             dpcmNames.add ("User " + juce::String (i + 1));
         dpcmSample.addItemList (dpcmNames, 1);
     }
+    dpcmSample.setTooltip ("Select DPCM sample to play");
     dpcmSample.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     dpcmSample.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     dpcmSample.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -115,6 +142,7 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     // DPCM Load button
     dpcmLoadButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
     dpcmLoadButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    dpcmLoadButton.setTooltip ("Load custom DPCM sample (.dmc or .wav)");
     dpcmLoadButton.onClick = [this]
     {
         dpcmFileChooser = std::make_shared<juce::FileChooser> (
@@ -168,13 +196,14 @@ void ModulationBarComponent::collapseAll()
 
 void ModulationBarComponent::styleKnob (juce::Slider& knob)
 {
-    knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 14);
-    knob.setColour (juce::Slider::rotarySliderFillColourId, Colors::accentActive);
-    knob.setColour (juce::Slider::rotarySliderOutlineColourId, Colors::knobOutline);
+    knob.setSliderStyle (juce::Slider::LinearHorizontal);
+    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 48, 16);
+    knob.setColour (juce::Slider::trackColourId, Colors::accentActive);
     knob.setColour (juce::Slider::thumbColourId, Colors::accentActive);
+    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline);
     knob.setColour (juce::Slider::textBoxTextColourId, Colors::textPrimary);
     knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    knob.setPopupMenuEnabled (true);
 }
 
 void ModulationBarComponent::setDetailVisible (int modIndex, bool visible)
@@ -194,7 +223,7 @@ void ModulationBarComponent::setDetailVisible (int modIndex, bool visible)
             setVis ({ &portaTime, &portaTimeLabel });
             break;
         case MOD_ARP:
-            setVis ({ &arpPattern, &arpRate, &arpOctaves, &arpGate, &arpPatternLabel, &arpRateLabel, &arpOctavesLabel, &arpGateLabel });
+            setVis ({ &arpPattern, &arpRate, &arpOctaves, &arpGate, &arpPatternLabel, &arpRateLabel, &arpOctavesLabel, &arpGateLabel, &arpSyncToggle, &arpSyncDiv });
             break;
         case MOD_DPCM:
             setVis ({ &dpcmSample, &dpcmSampleLabel, &dpcmLoadButton });
@@ -334,55 +363,71 @@ void ModulationBarComponent::paint (juce::Graphics& g)
 
 void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int modIndex)
 {
-    const int knobSize = 48;
-    const int labelH = 16;
-    const int comboH = 24;
-
-    auto layoutKnobColumn = [&] (juce::Rectangle<int> col, juce::Slider& knob, juce::Label& label)
-    {
-        auto labelArea = col.removeFromTop (labelH);
-        label.setBounds (labelArea);
-        knob.setBounds (col.withSizeKeepingCentre (knobSize, juce::jmin (knobSize + 14, col.getHeight())));
-    };
+    const int labelW = 65;
+    const int comboH = 22;
 
     area = area.reduced (8, 4);
+
+    auto layoutRow = [&] (juce::Rectangle<int>& a, juce::Slider& slider, juce::Label& label, int rowH)
+    {
+        auto row = a.removeFromTop (rowH);
+        label.setJustificationType (juce::Justification::centredRight);
+        label.setBounds (row.removeFromLeft (labelW));
+        row.removeFromLeft (4);
+        slider.setBounds (row);
+    };
 
     switch (modIndex)
     {
         case MOD_LFO:
         {
-            int colW = area.getWidth() / 3;
-            layoutKnobColumn (area.removeFromLeft (colW), lfoRate, lfoRateLabel);
-            layoutKnobColumn (area.removeFromLeft (colW), lfoVibrato, lfoVibratoLabel);
-            layoutKnobColumn (area, lfoTremolo, lfoTremoloLabel);
+            int rowH = area.getHeight() / 3;
+            layoutRow (area, lfoRate, lfoRateLabel, rowH);
+            layoutRow (area, lfoVibrato, lfoVibratoLabel, rowH);
+            layoutRow (area, lfoTremolo, lfoTremoloLabel, area.getHeight());
             break;
         }
         case MOD_PORTA:
         {
-            // Center the single knob
-            layoutKnobColumn (area.withSizeKeepingCentre (area.getWidth() / 3, area.getHeight()),
-                              portaTime, portaTimeLabel);
+            // Single slider, vertically centred
+            auto centred = area.withHeight (juce::jmin (24, area.getHeight()));
+            centred.setCentre (area.getCentreX(), area.getCentreY());
+            portaTimeLabel.setJustificationType (juce::Justification::centredRight);
+            portaTimeLabel.setBounds (centred.removeFromLeft (labelW));
+            centred.removeFromLeft (4);
+            portaTime.setBounds (centred);
             break;
         }
         case MOD_ARP:
         {
-            int colW = area.getWidth() / 4;
-            // Combo gets a column — use most of the column width
-            auto comboCol = area.removeFromLeft (colW);
-            arpPatternLabel.setBounds (comboCol.removeFromTop (labelH));
-            int cw = juce::jmax (80, comboCol.getWidth() - 12);
-            arpPattern.setBounds (comboCol.withSizeKeepingCentre (cw, comboH));
+            int rowH = area.getHeight() / 5;
 
-            layoutKnobColumn (area.removeFromLeft (colW), arpRate, arpRateLabel);
-            layoutKnobColumn (area.removeFromLeft (colW), arpOctaves, arpOctavesLabel);
-            layoutKnobColumn (area, arpGate, arpGateLabel);
+            // Pattern combo row
+            auto comboRow = area.removeFromTop (rowH);
+            arpPatternLabel.setJustificationType (juce::Justification::centredRight);
+            arpPatternLabel.setBounds (comboRow.removeFromLeft (labelW));
+            comboRow.removeFromLeft (4);
+            arpPattern.setBounds (comboRow.removeFromLeft (juce::jmin (100, comboRow.getWidth())));
+
+            layoutRow (area, arpRate, arpRateLabel, rowH);
+            layoutRow (area, arpOctaves, arpOctavesLabel, rowH);
+            layoutRow (area, arpGate, arpGateLabel, rowH);
+
+            // Sync row
+            auto syncRow = area;
+            arpSyncToggle.setBounds (syncRow.removeFromLeft (60));
+            syncRow.removeFromLeft (4);
+            arpSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (80, syncRow.getWidth()))
+                                       .withHeight (juce::jmin (comboH, syncRow.getHeight())));
             break;
         }
         case MOD_DPCM:
         {
-            auto comboCol = area.withSizeKeepingCentre (area.getWidth() / 2, area.getHeight());
-            dpcmSampleLabel.setBounds (comboCol.removeFromTop (labelH));
-            auto row = comboCol.removeFromTop (comboH + 4);
+            int labelH = 16;
+            auto centred = area.withSizeKeepingCentre (area.getWidth() / 2, area.getHeight());
+            dpcmSampleLabel.setJustificationType (juce::Justification::centred);
+            dpcmSampleLabel.setBounds (centred.removeFromTop (labelH));
+            auto row = centred.removeFromTop (comboH + 4);
             int cw = juce::jmax (80, row.getWidth() - 60);
             dpcmSample.setBounds (row.removeFromLeft (cw));
             row.removeFromLeft (4);

@@ -57,6 +57,10 @@ public:
 
     cart::DpcmSampleManager& getDpcmSampleManager() { return dpcmSampleManager; }
 
+    // MIDI Learn
+    void setMidiLearnSlot (int slot) { midiLearnSlot.store (slot); }
+    int  getMidiLearnSlot() const    { return midiLearnSlot.load(); }
+
     cart::ABCompare abCompare;
 
     // Per-channel activity flags for UI LEDs (audio thread writes, UI reads)
@@ -90,10 +94,14 @@ private:
     std::atomic<bool>      sustainPedal { false };
     bool                   wasSustaining = false;
     std::atomic<bool>      pendingDspReset { false };  // Defers reset to audio thread
+    std::atomic<int>       midiLearnSlot { -1 };       // -1 = not learning, 0-3 = slot index
+    float                  cachedBpm = 120.0f;          // Last known BPM from host
 
     // DC blocking filter state (removes NES DAC offset)
-    float dcBlockX = 0.0f;   // previous input
-    float dcBlockY = 0.0f;   // previous output
+    float dcBlockX = 0.0f;   // previous input  (left / mono)
+    float dcBlockY = 0.0f;   // previous output (left / mono)
+    float dcBlockXR = 0.0f;  // previous input  (right)
+    float dcBlockYR = 0.0f;  // previous output (right)
 
     // Cached parameter pointers for real-time access
     std::atomic<float>* masterVolumeParam  = nullptr;
@@ -142,6 +150,9 @@ private:
     std::atomic<float>* dpcmSampleParam    = nullptr;
 
     std::atomic<float>* vrc6EnabledParam   = nullptr;
+    std::atomic<float>* vrc6P1EnabledParam = nullptr;
+    std::atomic<float>* vrc6P2EnabledParam = nullptr;
+    std::atomic<float>* vrc6SawEnabledParam = nullptr;
     std::atomic<float>* vrc6P1DutyParam    = nullptr;
     std::atomic<float>* vrc6P1VolumeParam  = nullptr;
     std::atomic<float>* vrc6P1MixParam     = nullptr;
@@ -209,6 +220,22 @@ private:
     // Tuning system
     std::atomic<float>* tuningSystemParam = nullptr;
 
+    // Tempo sync
+    std::atomic<float>* arpSyncEnabledParam = nullptr;
+    std::atomic<float>* arpSyncDivParam     = nullptr;
+    std::atomic<float>* dlSyncEnabledParam  = nullptr;
+    std::atomic<float>* dlSyncDivParam      = nullptr;
+
+    // Per-channel pan
+    std::atomic<float>* p1PanParam       = nullptr;
+    std::atomic<float>* p2PanParam       = nullptr;
+    std::atomic<float>* triPanParam      = nullptr;
+    std::atomic<float>* noisePanParam    = nullptr;
+    std::atomic<float>* dpcmPanParam     = nullptr;
+    std::atomic<float>* vrc6P1PanParam   = nullptr;
+    std::atomic<float>* vrc6P2PanParam   = nullptr;
+    std::atomic<float>* vrc6SawPanParam  = nullptr;
+
     // Cached previous values for change detection
     struct CachedParams
     {
@@ -240,6 +267,7 @@ private:
         float dpcmLoop = -1.0f, dpcmMix = -1.0f, dpcmSample = -1.0f;
 
         float vrc6Enabled = -1.0f;
+        float vrc6P1Enabled = -1.0f, vrc6P2Enabled = -1.0f, vrc6SawEnabled = -1.0f;
         float vrc6P1Duty = -1.0f, vrc6P1Volume = -1.0f, vrc6P1Mix = -1.0f;
         float vrc6P2Duty = -1.0f, vrc6P2Volume = -1.0f, vrc6P2Mix = -1.0f;
         float vrc6SawRate = -1.0f, vrc6SawMix = -1.0f;

@@ -27,9 +27,11 @@ public:
     std::function<void()> onPresetChanged;
     std::function<void (float)> onScaleChanged;
     std::function<void (bool)> onEngineToggle;   // true = Modern
+    std::function<void()> onAudioSettings;       // Standalone: open audio/MIDI settings
 
     void navigatePreset (int delta);
     void setScaleIndex (int comboId) { scaleCombo.setSelectedId (comboId, juce::dontSendNotification); }
+    void showAudioSettingsButton (bool show) { audioSettingsButton.setVisible (show); if (show) addAndMakeVisible (audioSettingsButton); }
 
 private:
     CartridgeProcessor& processorRef;
@@ -42,6 +44,7 @@ private:
     juce::TextButton saveButton { "Save" };
     juce::TextButton importButton { "Import" };
     juce::TextButton exportButton { "Export" };
+    juce::TextButton deleteButton { "Del" };
     juce::TextButton panicButton { "Panic" };
 
     // Global controls
@@ -77,6 +80,7 @@ private:
 
     juce::ComboBox scaleCombo;
     juce::TextButton midiInfoButton { "MIDI" };
+    juce::TextButton audioSettingsButton { "Gear" };
 
     // A/B Comparison
     juce::TextButton abButton { "A" };

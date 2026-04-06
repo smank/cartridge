@@ -24,6 +24,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     bcEnable.setSize (0, 0); // invisible; we draw LED manually
 
     styleKnob (bcBitDepth);
+    bcBitDepth.setTooltip ("Bit depth reduction (lower = crunchier)");
     addChildComponent (bcBitDepth);
     bcBitDepthAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::BcBitDepth, bcBitDepth);
@@ -31,6 +32,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (bcBitDepthLabel);
 
     styleKnob (bcRate);
+    bcRate.setTooltip ("Sample rate reduction factor");
     addChildComponent (bcRate);
     bcRateAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::BcRateReduce, bcRate);
@@ -38,6 +40,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (bcRateLabel);
 
     styleKnob (bcMix);
+    bcMix.setTooltip ("BitCrush dry/wet mix");
     addChildComponent (bcMix);
     bcMixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::BcMix, bcMix);
@@ -52,6 +55,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     fltEnable.setSize (0, 0);
 
     fltType.addItemList ({ "LP", "BP", "HP" }, 1);
+    fltType.setTooltip ("Filter type: Low-pass, Band-pass, High-pass");
     fltType.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     fltType.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     fltType.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -62,6 +66,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (fltTypeLabel);
 
     styleKnob (fltCutoff);
+    fltCutoff.setTooltip ("Filter cutoff frequency");
     addChildComponent (fltCutoff);
     fltCutoffAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::FltCutoff, fltCutoff);
@@ -69,6 +74,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (fltCutoffLabel);
 
     styleKnob (fltResonance);
+    fltResonance.setTooltip ("Filter resonance (peak at cutoff)");
     addChildComponent (fltResonance);
     fltResonanceAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::FltResonance, fltResonance);
@@ -83,6 +89,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     chEnable.setSize (0, 0);
 
     styleKnob (chRate);
+    chRate.setTooltip ("Chorus modulation rate");
     addChildComponent (chRate);
     chRateAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::ChRate, chRate);
@@ -90,6 +97,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (chRateLabel);
 
     styleKnob (chDepth);
+    chDepth.setTooltip ("Chorus modulation depth");
     addChildComponent (chDepth);
     chDepthAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::ChDepth, chDepth);
@@ -97,6 +105,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (chDepthLabel);
 
     styleKnob (chMix);
+    chMix.setTooltip ("Chorus dry/wet mix");
     addChildComponent (chMix);
     chMixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::ChMix, chMix);
@@ -111,6 +120,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     dlEnable.setSize (0, 0);
 
     styleKnob (dlTime);
+    dlTime.setTooltip ("Delay time in milliseconds");
     addChildComponent (dlTime);
     dlTimeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::DlTime, dlTime);
@@ -118,6 +128,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (dlTimeLabel);
 
     styleKnob (dlFeedback);
+    dlFeedback.setTooltip ("Delay feedback (echo repeats)");
     addChildComponent (dlFeedback);
     dlFeedbackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::DlFeedback, dlFeedback);
@@ -125,11 +136,30 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (dlFeedbackLabel);
 
     styleKnob (dlMix);
+    dlMix.setTooltip ("Delay dry/wet mix");
     addChildComponent (dlMix);
     dlMixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::DlMix, dlMix);
     makeKnobLabel (dlMixLabel, "Mix");
     addChildComponent (dlMixLabel);
+
+    // Delay tempo sync
+    dlSyncToggle.setButtonText ("Sync");
+    dlSyncToggle.setColour (juce::ToggleButton::textColourId, Colors::textSecondary);
+    dlSyncToggle.setColour (juce::ToggleButton::tickColourId, Colors::fxAccent);
+    dlSyncToggle.setTooltip ("Sync delay time to host tempo");
+    addChildComponent (dlSyncToggle);
+    dlSyncAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        apvts, ParamIDs::DlSyncEnabled, dlSyncToggle);
+
+    dlSyncDiv.addItemList ({ "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T" }, 1);
+    dlSyncDiv.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
+    dlSyncDiv.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
+    dlSyncDiv.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    dlSyncDiv.setTooltip ("Delay tempo sync note division");
+    addChildComponent (dlSyncDiv);
+    dlSyncDivAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
+        apvts, ParamIDs::DlSyncDiv, dlSyncDiv);
 
     // ─── Reverb ────────────────────────────────────────────────────────
     rvEnable.setClickingTogglesState (true);
@@ -139,6 +169,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     rvEnable.setSize (0, 0);
 
     styleKnob (rvSize);
+    rvSize.setTooltip ("Reverb room size");
     addChildComponent (rvSize);
     rvSizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::RvSize, rvSize);
@@ -146,6 +177,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (rvSizeLabel);
 
     styleKnob (rvDamping);
+    rvDamping.setTooltip ("Reverb high-frequency damping");
     addChildComponent (rvDamping);
     rvDampingAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::RvDamping, rvDamping);
@@ -153,6 +185,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (rvDampingLabel);
 
     styleKnob (rvWidth);
+    rvWidth.setTooltip ("Reverb stereo width");
     addChildComponent (rvWidth);
     rvWidthAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::RvWidth, rvWidth);
@@ -160,6 +193,7 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (rvWidthLabel);
 
     styleKnob (rvMix);
+    rvMix.setTooltip ("Reverb dry/wet mix");
     addChildComponent (rvMix);
     rvMixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::RvMix, rvMix);
@@ -201,13 +235,14 @@ void EffectsBarComponent::collapseAll()
 
 void EffectsBarComponent::styleKnob (juce::Slider& knob)
 {
-    knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 14);
-    knob.setColour (juce::Slider::rotarySliderFillColourId, Colors::fxAccent);
-    knob.setColour (juce::Slider::rotarySliderOutlineColourId, Colors::knobOutline);
+    knob.setSliderStyle (juce::Slider::LinearHorizontal);
+    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 48, 16);
+    knob.setColour (juce::Slider::trackColourId, Colors::fxAccent);
     knob.setColour (juce::Slider::thumbColourId, Colors::fxAccent);
+    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline);
     knob.setColour (juce::Slider::textBoxTextColourId, Colors::textPrimary);
     knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    knob.setPopupMenuEnabled (true);
 }
 
 void EffectsBarComponent::setDetailVisible (int fxIndex, bool visible)
@@ -230,7 +265,7 @@ void EffectsBarComponent::setDetailVisible (int fxIndex, bool visible)
             setVis ({ &chRate, &chDepth, &chMix, &chRateLabel, &chDepthLabel, &chMixLabel });
             break;
         case FX_DELAY:
-            setVis ({ &dlTime, &dlFeedback, &dlMix, &dlTimeLabel, &dlFeedbackLabel, &dlMixLabel });
+            setVis ({ &dlTime, &dlFeedback, &dlMix, &dlTimeLabel, &dlFeedbackLabel, &dlMixLabel, &dlSyncToggle, &dlSyncDiv });
             break;
         case FX_REVERB:
             setVis ({ &rvSize, &rvDamping, &rvWidth, &rvMix, &rvSizeLabel, &rvDampingLabel, &rvWidthLabel, &rvMixLabel });
@@ -357,65 +392,74 @@ void EffectsBarComponent::paint (juce::Graphics& g)
 
 void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIndex)
 {
-    const int knobSize = 48;
-    const int labelH = 16;
-    const int comboH = 24;
-
-    auto layoutKnobColumn = [&] (juce::Rectangle<int> col, juce::Slider& knob, juce::Label& label)
-    {
-        auto labelArea = col.removeFromTop (labelH);
-        label.setBounds (labelArea);
-        knob.setBounds (col.withSizeKeepingCentre (knobSize, juce::jmin (knobSize + 14, col.getHeight())));
-    };
+    const int labelW = 65;
+    const int comboH = 22;
 
     area = area.reduced (8, 4);
+
+    // Compute row height to fill available space
+    auto layoutRow = [&] (juce::Rectangle<int>& a, juce::Slider& slider, juce::Label& label, int rowH)
+    {
+        auto row = a.removeFromTop (rowH);
+        label.setJustificationType (juce::Justification::centredRight);
+        label.setBounds (row.removeFromLeft (labelW));
+        row.removeFromLeft (4);
+        slider.setBounds (row);
+    };
 
     switch (fxIndex)
     {
         case FX_CRUSH:
         {
-            int colW = area.getWidth() / 3;
-            layoutKnobColumn (area.removeFromLeft (colW), bcBitDepth, bcBitDepthLabel);
-            layoutKnobColumn (area.removeFromLeft (colW), bcRate, bcRateLabel);
-            layoutKnobColumn (area, bcMix, bcMixLabel);
+            int rowH = area.getHeight() / 3;
+            layoutRow (area, bcBitDepth, bcBitDepthLabel, rowH);
+            layoutRow (area, bcRate, bcRateLabel, rowH);
+            layoutRow (area, bcMix, bcMixLabel, area.getHeight());
             break;
         }
         case FX_FILTER:
         {
-            int colW = area.getWidth() / 3;
-            // Combo gets a column — use most of the column width
-            auto comboCol = area.removeFromLeft (colW);
-            fltTypeLabel.setBounds (comboCol.removeFromTop (labelH));
-            int cw = juce::jmax (60, comboCol.getWidth() - 12);
-            fltType.setBounds (comboCol.withSizeKeepingCentre (cw, comboH));
+            int rowH = area.getHeight() / 3;
+            // Type combo row
+            auto comboRow = area.removeFromTop (rowH);
+            fltTypeLabel.setJustificationType (juce::Justification::centredRight);
+            fltTypeLabel.setBounds (comboRow.removeFromLeft (labelW));
+            comboRow.removeFromLeft (4);
+            fltType.setBounds (comboRow.removeFromLeft (juce::jmin (80, comboRow.getWidth())));
 
-            layoutKnobColumn (area.removeFromLeft (colW), fltCutoff, fltCutoffLabel);
-            layoutKnobColumn (area, fltResonance, fltResonanceLabel);
+            layoutRow (area, fltCutoff, fltCutoffLabel, rowH);
+            layoutRow (area, fltResonance, fltResonanceLabel, area.getHeight());
             break;
         }
         case FX_CHORUS:
         {
-            int colW = area.getWidth() / 3;
-            layoutKnobColumn (area.removeFromLeft (colW), chRate, chRateLabel);
-            layoutKnobColumn (area.removeFromLeft (colW), chDepth, chDepthLabel);
-            layoutKnobColumn (area, chMix, chMixLabel);
+            int rowH = area.getHeight() / 3;
+            layoutRow (area, chRate, chRateLabel, rowH);
+            layoutRow (area, chDepth, chDepthLabel, rowH);
+            layoutRow (area, chMix, chMixLabel, area.getHeight());
             break;
         }
         case FX_DELAY:
         {
-            int colW = area.getWidth() / 3;
-            layoutKnobColumn (area.removeFromLeft (colW), dlTime, dlTimeLabel);
-            layoutKnobColumn (area.removeFromLeft (colW), dlFeedback, dlFeedbackLabel);
-            layoutKnobColumn (area, dlMix, dlMixLabel);
+            int rowH = area.getHeight() / 4;
+            layoutRow (area, dlTime, dlTimeLabel, rowH);
+            layoutRow (area, dlFeedback, dlFeedbackLabel, rowH);
+            layoutRow (area, dlMix, dlMixLabel, rowH);
+
+            // Sync row
+            auto syncRow = area;
+            dlSyncToggle.setBounds (syncRow.removeFromLeft (60));
+            syncRow.removeFromLeft (4);
+            dlSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (80, syncRow.getWidth())).withHeight (juce::jmin (comboH, syncRow.getHeight())));
             break;
         }
         case FX_REVERB:
         {
-            int colW = area.getWidth() / 4;
-            layoutKnobColumn (area.removeFromLeft (colW), rvSize, rvSizeLabel);
-            layoutKnobColumn (area.removeFromLeft (colW), rvDamping, rvDampingLabel);
-            layoutKnobColumn (area.removeFromLeft (colW), rvWidth, rvWidthLabel);
-            layoutKnobColumn (area, rvMix, rvMixLabel);
+            int rowH = area.getHeight() / 4;
+            layoutRow (area, rvSize, rvSizeLabel, rowH);
+            layoutRow (area, rvDamping, rvDampingLabel, rowH);
+            layoutRow (area, rvWidth, rvWidthLabel, rowH);
+            layoutRow (area, rvMix, rvMixLabel, area.getHeight());
             break;
         }
         default: break;

@@ -54,12 +54,12 @@ void EffectsChain::updateFromParams (juce::AudioProcessorValueTreeState& apvts)
 
 void EffectsChain::process (juce::AudioBuffer<float>& buffer)
 {
-    // 1. Mono effects on ch0
+    // 1. Mono effects on ch0 (and ch1 if stereo input)
     bitCrush.process (buffer);
     filter.process (buffer);
 
-    // 2. Copy ch0 → ch1 (mono→stereo)
-    if (buffer.getNumChannels() >= 2)
+    // 2. Copy ch0 → ch1 (mono→stereo) — skip when input is already stereo
+    if (!stereoInput && buffer.getNumChannels() >= 2)
     {
         buffer.copyFrom (1, 0, buffer, 0, 0, buffer.getNumSamples());
     }

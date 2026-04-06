@@ -1,4 +1,7 @@
 #include "PluginEditor.h"
+#if JUCE_STANDALONE_APPLICATION || JucePlugin_Build_Standalone
+ #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#endif
 
 CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     : AudioProcessorEditor (p),
@@ -31,11 +34,58 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
         modernModeActive = modern;
         channelStrips.setVisible (!modern);
         modernPanel.setVisible (modern);
+
+        // Refresh VRC6 strip visibility when returning to Classic mode
+        if (!modern)
+        {
+            auto* vrc6Param = processorRef.getApvts().getRawParameterValue (cart::ParamIDs::Vrc6Enabled);
+            if (vrc6Param != nullptr)
+                channelStrips.setVrc6Visible (vrc6Param->load() >= 0.5f);
+        }
+
         resized();
     };
 
     // Wire up UI scaling from top bar
     topBar.onScaleChanged = [this] (float s) { applyScale (s); };
+
+    // Wire up audio settings button (standalone only)
+#if JUCE_STANDALONE_APPLICATION || JucePlugin_Build_Standalone
+    if (auto* holder = juce::StandalonePluginHolder::getInstance())
+    {
+        topBar.onAudioSettings = []
+        {
+            auto* h = juce::StandalonePluginHolder::getInstance();
+            if (h == nullptr) return;
+
+            // Build our own dialog so we can hide the Bluetooth MIDI button
+            // (it crashes on unsigned builds without BT entitlements)
+            auto content = std::make_unique<juce::AudioDeviceSelectorComponent> (
+                h->deviceManager, 0, 0, 0, 2, true, false, true, false);
+            content->setSize (500, 550);
+
+            // Walk children and hide any Bluetooth-related button
+            for (auto* child : content->getChildren())
+            {
+                if (auto* btn = dynamic_cast<juce::TextButton*> (child))
+                {
+                    if (btn->getButtonText().containsIgnoreCase ("bluetooth"))
+                        btn->setVisible (false);
+                }
+            }
+
+            juce::DialogWindow::LaunchOptions o;
+            o.content.setOwned (content.release());
+            o.dialogTitle = "Audio/MIDI Settings";
+            o.dialogBackgroundColour = cart::Colors::bgMid;
+            o.escapeKeyTriggersCloseButton = true;
+            o.useNativeTitleBar = true;
+            o.resizable = false;
+            o.launchAsync();
+        };
+        topBar.showAudioSettingsButton (true);
+    }
+#endif
 
     // Wire up DPCM sample loading from modulation bar
     modulationBar.onDpcmLoad = [this] (const juce::File& file)
@@ -110,7 +160,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
     setSize (initW, initH);
     setResizable (true, true);
-    setResizeLimits (juce::jmin (initW, 800), juce::jmin (initH, 640), 3840, 2160);
+    setResizeLimits (baseWidth, baseHeight, 3840, 2160);
     setWantsKeyboardFocus (true);
 
     // Editor keeps focus so shortcut keys ([, ], -, =, Tab, etc.) are handled
@@ -157,7 +207,7 @@ void CartridgeEditor::applyScale (float scale)
     currentScale = scale;
     int w = juce::roundToInt (baseWidth * scale);
     int h = juce::roundToInt (baseHeight * scale);
-    setResizeLimits (juce::jmin (w, 800), juce::jmin (h, 640), 3840, 2160);
+    setResizeLimits (baseWidth, baseHeight, 3840, 2160);
     setSize (w, h);
     saveScalePreference();
 }
@@ -172,12 +222,13 @@ void CartridgeEditor::loadScalePreference()
     {
         float scale = static_cast<float> (xml->getDoubleAttribute ("uiScale", 1.0));
 
-        // Map scale to combo ID: 0.75→1, 1.0→2, 1.25→3, 1.5→4
-        int comboId = 2;
-        if      (scale <= 0.76f) comboId = 1;
-        else if (scale <= 1.01f) comboId = 2;
-        else if (scale <= 1.26f) comboId = 3;
-        else                     comboId = 4;
+        // Map scale to combo ID: 1.0→1, 1.25→2, 1.5→3
+        // Clamp up any legacy 75% to 100%
+        if (scale < 1.0f) scale = 1.0f;
+        int comboId = 1;
+        if      (scale <= 1.01f) comboId = 1;
+        else if (scale <= 1.26f) comboId = 2;
+        else                     comboId = 3;
 
         topBar.setScaleIndex (comboId);
         currentScale = scale;
@@ -201,11 +252,7 @@ void CartridgeEditor::paint (juce::Graphics& g)
 
 void CartridgeEditor::resized()
 {
-    // Center all content within a max-width column; bgDark fills the margins
-    static constexpr int maxContentWidth = 1600;
     auto area = getLocalBounds();
-    if (area.getWidth() > maxContentWidth)
-        area = area.withSizeKeepingCentre (maxContentWidth, area.getHeight());
 
     topBar.setBounds (area.removeFromTop (topBarHeight));
     waveformDisplay.setBounds (area.removeFromTop (waveformHeight).reduced (4, 2));

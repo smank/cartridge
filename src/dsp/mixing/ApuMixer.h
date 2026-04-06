@@ -20,6 +20,13 @@ public:
     float mixFloat (float pulse1, float pulse2,
                     float triangle, float noise, float dpcm) const;
 
+    /// Per-channel nonlinear outputs for stereo panning.
+    /// Each channel is individually scaled through the NES DAC curve.
+    /// out[0]=pulse1, out[1]=pulse2, out[2]=tri, out[3]=noise, out[4]=dpcm
+    void mixIndividual (float pulse1, float pulse2,
+                        float triangle, float noise, float dpcm,
+                        float out[5]) const;
+
     /// Per-channel mix levels (0.0–1.0)
     void setPulseMix (float level)     { pulseMixLevel = level; }
     void setTriangleMix (float level)  { triangleMixLevel = level; }

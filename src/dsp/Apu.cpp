@@ -98,4 +98,46 @@ float Apu::process()
     return output * masterVolume;
 }
 
+void Apu::processIndividual (float out[8])
+{
+    // Clock the frame counter
+    framePhase += framePhaseInc;
+    while (framePhase >= 1.0)
+    {
+        framePhase -= 1.0;
+        clockFrameCounter();
+    }
+
+    // Process base APU channels
+    float p1  = pulse1Ch.process();
+    float p2  = pulse2Ch.process();
+    float tri = triangleCh.process();
+    float noi = noiseCh.process();
+    float dpc = dpcmCh.process();
+
+    // Per-channel nonlinear DAC
+    float baseOut[5];
+    apuMixer.mixIndividual (p1, p2, tri, noi, dpc, baseOut);
+
+    out[0] = baseOut[0] * masterVolume;
+    out[1] = baseOut[1] * masterVolume;
+    out[2] = baseOut[2] * masterVolume;
+    out[3] = baseOut[3] * masterVolume;
+    out[4] = baseOut[4] * masterVolume;
+
+    // VRC6 expansion channels
+    if (vrc6Enabled)
+    {
+        out[5] = vrc6Pulse1Ch.process() * vrc6Pulse1Mix * 0.20f * masterVolume;
+        out[6] = vrc6Pulse2Ch.process() * vrc6Pulse2Mix * 0.20f * masterVolume;
+        out[7] = vrc6SawCh.process()    * vrc6SawMix    * 0.22f * masterVolume;
+    }
+    else
+    {
+        out[5] = 0.0f;
+        out[6] = 0.0f;
+        out[7] = 0.0f;
+    }
+}
+
 } // namespace cart

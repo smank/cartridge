@@ -4,6 +4,28 @@ namespace cart {
 
 static const juce::String emptyName = "---";
 
+// Sanitize preset name for use as a filename (cross-platform safe)
+static juce::String sanitizeFilename (const juce::String& name)
+{
+    juce::String safe;
+    for (auto c : name)
+    {
+        // Strip characters illegal on Windows/macOS/Linux filesystems
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?'
+            || c == '"' || c == '<' || c == '>' || c == '|')
+            safe += '_';
+        else
+            safe += c;
+    }
+    // Trim leading/trailing whitespace and dots (Windows disallows trailing dots)
+    safe = safe.trim();
+    while (safe.endsWithChar ('.'))
+        safe = safe.dropLastCharacters (1);
+    if (safe.isEmpty())
+        safe = "Untitled";
+    return safe;
+}
+
 juce::File PresetManager::getUserPresetDirectory() const
 {
     auto dir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
@@ -25,7 +47,7 @@ void PresetManager::saveUserPreset (const juce::String& name, juce::AudioProcess
             p.values.push_back ({ paramID, param->convertFrom0to1 (param->getValue()) });
     }
 
-    auto file = getUserPresetDirectory().getChildFile (name + ".xml");
+    auto file = getUserPresetDirectory().getChildFile (sanitizeFilename (name) + ".xml");
     savePresetToFile (p, file);
     refreshUserPresets();
 }
@@ -92,7 +114,7 @@ void PresetManager::deleteUserPreset (int index)
 {
     if (!isFactoryPreset (index) && index < static_cast<int> (presets.size()))
     {
-        auto file = getUserPresetDirectory().getChildFile (presets[static_cast<size_t> (index)].name + ".xml");
+        auto file = getUserPresetDirectory().getChildFile (sanitizeFilename (presets[static_cast<size_t> (index)].name) + ".xml");
         file.deleteFile();
         refreshUserPresets();
     }
@@ -789,8 +811,8 @@ void PresetManager::buildPresets()
         { ParamIDs::ChMix,            0.3f },
     }));
 
-    // 32. NES Poly Lead — Punchy polyphonic 25% pulse
-    presets.push_back (makePreset ("NES Poly Lead", {
+    // 32. Chiptune Poly Lead — Punchy polyphonic 25% pulse
+    presets.push_back (makePreset ("Chiptune Poly Lead", {
         { ParamIDs::EngineMode,       1.0f },   // Modern
         { ParamIDs::ModWaveform,      0.0f },   // Pulse 25%
         { ParamIDs::ModVoices,        6.0f },
@@ -938,7 +960,7 @@ int PresetManager::importPreset (const juce::File& file)
         }
 
         // Save to user preset directory and reload
-        auto destFile = getUserPresetDirectory().getChildFile (p.name + ".xml");
+        auto destFile = getUserPresetDirectory().getChildFile (sanitizeFilename (p.name) + ".xml");
         savePresetToFile (p, destFile);
         refreshUserPresets();
         return static_cast<int> (presets.size()) - 1;
@@ -986,7 +1008,7 @@ int PresetManager::importBank (const juce::File& file)
             }
         }
 
-        auto destFile = getUserPresetDirectory().getChildFile (p.name + ".xml");
+        auto destFile = getUserPresetDirectory().getChildFile (sanitizeFilename (p.name) + ".xml");
         savePresetToFile (p, destFile);
         ++imported;
     }

@@ -34,6 +34,7 @@ private:
     cart::ModulationBarComponent modulationBar;
     cart::StatusBarComponent statusBar;
     juce::MidiKeyboardComponent keyboard;
+    juce::TooltipWindow tooltipWindow { this, 500 };
 
     bool modernModeActive = false;
 

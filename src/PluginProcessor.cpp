@@ -3,6 +3,20 @@
 #include "dsp/DpcmSamples.h"
 #include <cmath>
 
+namespace {
+    // Tempo sync division index to beats:
+    // 0=1/1(4.0), 1=1/2(2.0), 2=1/4(1.0), 3=1/8(0.5), 4=1/16(0.25), 5=1/32(0.125)
+    // 6=1/4T(0.667), 7=1/8T(0.333), 8=1/16T(0.167)
+    float divisionToBeats (int divIndex)
+    {
+        static constexpr float beats[] = { 4.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.125f,
+                                            2.0f / 3.0f, 1.0f / 3.0f, 0.5f / 3.0f };
+        if (divIndex >= 0 && divIndex < 9)
+            return beats[divIndex];
+        return 1.0f;
+    }
+}
+
 CartridgeProcessor::CartridgeProcessor()
     : AudioProcessor (BusesProperties()
                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
@@ -57,6 +71,9 @@ CartridgeProcessor::CartridgeProcessor()
     dpcmSampleParam    = apvts.getRawParameterValue (cart::ParamIDs::DpcmSample);
 
     vrc6EnabledParam   = apvts.getRawParameterValue (cart::ParamIDs::Vrc6Enabled);
+    vrc6P1EnabledParam = apvts.getRawParameterValue (cart::ParamIDs::Vrc6P1Enabled);
+    vrc6P2EnabledParam = apvts.getRawParameterValue (cart::ParamIDs::Vrc6P2Enabled);
+    vrc6SawEnabledParam = apvts.getRawParameterValue (cart::ParamIDs::Vrc6SawEnabled);
     vrc6P1DutyParam    = apvts.getRawParameterValue (cart::ParamIDs::Vrc6P1Duty);
     vrc6P1VolumeParam  = apvts.getRawParameterValue (cart::ParamIDs::Vrc6P1Volume);
     vrc6P1MixParam     = apvts.getRawParameterValue (cart::ParamIDs::Vrc6P1Mix);
@@ -123,12 +140,28 @@ CartridgeProcessor::CartridgeProcessor()
 
     tuningSystemParam = apvts.getRawParameterValue(cart::ParamIDs::TuningSystem);
 
+    // Tempo sync params
+    arpSyncEnabledParam = apvts.getRawParameterValue(cart::ParamIDs::ArpSyncEnabled);
+    arpSyncDivParam     = apvts.getRawParameterValue(cart::ParamIDs::ArpSyncDiv);
+    dlSyncEnabledParam  = apvts.getRawParameterValue(cart::ParamIDs::DlSyncEnabled);
+    dlSyncDivParam      = apvts.getRawParameterValue(cart::ParamIDs::DlSyncDiv);
+
+    // Per-channel pan params
+    p1PanParam       = apvts.getRawParameterValue(cart::ParamIDs::P1Pan);
+    p2PanParam       = apvts.getRawParameterValue(cart::ParamIDs::P2Pan);
+    triPanParam      = apvts.getRawParameterValue(cart::ParamIDs::TriPan);
+    noisePanParam    = apvts.getRawParameterValue(cart::ParamIDs::NoisePan);
+    dpcmPanParam     = apvts.getRawParameterValue(cart::ParamIDs::DpcmPan);
+    vrc6P1PanParam   = apvts.getRawParameterValue(cart::ParamIDs::Vrc6P1Pan);
+    vrc6P2PanParam   = apvts.getRawParameterValue(cart::ParamIDs::Vrc6P2Pan);
+    vrc6SawPanParam  = apvts.getRawParameterValue(cart::ParamIDs::Vrc6SawPan);
+
     modernVoiceManager.setEngine (&modernEngine);
 
     abCompare.initialize (apvts);
 
-    // MIDI CC → parameter mappings
-    voiceManager.onControlChange = [this] (int cc, float value01)
+    // MIDI CC → parameter mappings (shared by both Classic and Modern engines)
+    auto ccHandler = [this] (int cc, float value01)
     {
         auto setNorm = [&] (const char* paramID, float v)
         {
@@ -141,6 +174,19 @@ CartridgeProcessor::CartridgeProcessor()
             if (auto* p = apvts.getParameter (paramID))
                 p->setValueNotifyingHost (p->convertTo0to1 (v));
         };
+
+        // MIDI Learn: if learning, assign incoming CC to the learn slot
+        int learnSlot = midiLearnSlot.exchange(-1);
+        if (learnSlot >= 0 && learnSlot < 4)
+        {
+            const char* ccNumIDs[] = {
+                cart::ParamIDs::UserCC1Num, cart::ParamIDs::UserCC2Num,
+                cart::ParamIDs::UserCC3Num, cart::ParamIDs::UserCC4Num
+            };
+            if (auto* p = apvts.getParameter(ccNumIDs[learnSlot]))
+                p->setValueNotifyingHost(p->convertTo0to1(static_cast<float>(cc)));
+            return;  // consume this CC event
+        }
 
         // Check user CC mappings first
         auto checkUserCC = [&](std::atomic<float>* numParam, std::atomic<float>* targetParam)
@@ -204,6 +250,9 @@ CartridgeProcessor::CartridgeProcessor()
             default: break;
         }
     };
+
+    voiceManager.onControlChange = ccHandler;
+    modernVoiceManager.onControlChange = ccHandler;
 }
 
 CartridgeProcessor::~CartridgeProcessor() = default;
@@ -257,7 +306,9 @@ void CartridgeProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 void CartridgeProcessor::releaseResources()
 {
     effectsChain.reset();
-    apu.reset();
+    // Don't reset APU here — prepareToPlay handles it on next start.
+    // Resetting mid-stream causes an audible pop if the audio callback
+    // fires one more time after this.
 }
 
 void CartridgeProcessor::updateDspFromParameters()
@@ -421,8 +472,18 @@ void CartridgeProcessor::updateDspFromParameters()
     // DPCM sample fallback for note mapping
     voiceManager.setDpcmSample (static_cast<int> (cachedParams.dpcmSample));
 
-    // Engine mode
+    // Engine mode — full transition on switch to suppress pop
     bool modernMode = (static_cast<int> (*engineModeParam) == 1);
+    if (modernMode != usingModernEngine)
+    {
+        dcBlockX = dcBlockY = dcBlockXR = dcBlockYR = 0.0f;
+        effectsChain.reset();
+        voiceManager.handleAllNotesOff();
+        modernVoiceManager.handleAllNotesOff();
+        arpeggiator.reset();
+        lastArpNote = -1;
+        fadeInSamplesRemaining = 1024;
+    }
     usingModernEngine = modernMode;
     if (modernMode)
     {
@@ -446,7 +507,17 @@ void CartridgeProcessor::updateDspFromParameters()
     // Arpeggiator
     arpeggiator.setEnabled (*arpEnabledParam > 0.5f);
     arpeggiator.setPattern (static_cast<cart::ArpPattern> (static_cast<int> (*arpPatternParam)));
-    arpeggiator.setRateHz (*arpRateParam);
+
+    if (*arpSyncEnabledParam > 0.5f)
+    {
+        float beatsPerDiv = divisionToBeats (static_cast<int> (*arpSyncDivParam));
+        arpeggiator.setRateHz (cachedBpm / (60.0f * beatsPerDiv));
+    }
+    else
+    {
+        arpeggiator.setRateHz (*arpRateParam);
+    }
+
     arpeggiator.setOctaves (static_cast<int> (*arpOctavesParam));
     arpeggiator.setGateLength (*arpGateParam);
 
@@ -475,16 +546,19 @@ void CartridgeProcessor::updateDspFromParameters()
         modernVoiceManager.setTuningTable(&tuningTable);
     }
 
-    // Pass channel enabled state for Auto mode routing
+    // Pass channel enabled state for Auto/Layer mode routing
     voiceManager.setChannelEnabled (0, cachedParams.p1Enabled > 0.5f);
     voiceManager.setChannelEnabled (1, cachedParams.p2Enabled > 0.5f);
     voiceManager.setChannelEnabled (2, cachedParams.triEnabled > 0.5f);
     voiceManager.setChannelEnabled (3, cachedParams.noiseEnabled > 0.5f);
     voiceManager.setChannelEnabled (4, cachedParams.dpcmEnabled > 0.5f);
-    // VRC6 channels: only route notes to channels with mix > 0
-    voiceManager.setChannelEnabled (5, vrc6On && cachedParams.vrc6P1Mix > 0.0f);
-    voiceManager.setChannelEnabled (6, vrc6On && cachedParams.vrc6P2Mix > 0.0f);
-    voiceManager.setChannelEnabled (7, vrc6On && cachedParams.vrc6SawMix > 0.0f);
+    // VRC6 channels: use individual enable toggles (gated by master VRC6 switch)
+    if (changed (cachedParams.vrc6P1Enabled, *vrc6P1EnabledParam)) {}
+    if (changed (cachedParams.vrc6P2Enabled, *vrc6P2EnabledParam)) {}
+    if (changed (cachedParams.vrc6SawEnabled, *vrc6SawEnabledParam)) {}
+    voiceManager.setChannelEnabled (5, vrc6On && cachedParams.vrc6P1Enabled > 0.5f);
+    voiceManager.setChannelEnabled (6, vrc6On && cachedParams.vrc6P2Enabled > 0.5f);
+    voiceManager.setChannelEnabled (7, vrc6On && cachedParams.vrc6SawEnabled > 0.5f);
 }
 
 void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
@@ -509,9 +583,27 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         fadeInSamplesRemaining = 1024;   // ~23 ms — covers DC blocker settling
     }
 
+    // Query host tempo
+    if (auto* playHead = getPlayHead())
+    {
+        if (auto posInfo = playHead->getPosition())
+        {
+            if (posInfo->getBpm().hasValue())
+                cachedBpm = static_cast<float> (*posInfo->getBpm());
+        }
+    }
+
     // Update DSP parameters from APVTS
     updateDspFromParameters();
     effectsChain.updateFromParams (apvts);
+
+    // Override delay time if sync enabled
+    if (*dlSyncEnabledParam > 0.5f)
+    {
+        float beatsPerDiv = divisionToBeats (static_cast<int> (*dlSyncDivParam));
+        float syncMs = beatsPerDiv * (60000.0f / cachedBpm);
+        effectsChain.getDelay().setTime (syncMs);
+    }
 
     // Inject MIDI events from on-screen keyboard
     keyboardState.processNextMidiBuffer (midiMessages, 0, buffer.getNumSamples(), true);
@@ -629,35 +721,73 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         lfo.tick();
         float pitchMult = lfo.getPitchMultiplier();
 
-        float out;
         if (usingModernEngine)
         {
-            // Modern engine path
+            // Modern engine path — mono, no per-channel panning
             if (pitchMult != 1.0f)
                 modernVoiceManager.applyPitchMultiplier (pitchMult);
 
-            out = modernEngine.process() * lfo.getVolumeMultiplier();
+            float out = modernEngine.process() * lfo.getVolumeMultiplier();
+
+            // DC blocking filter
+            float dcOut = out - dcBlockX + 0.995f * dcBlockY;
+            dcBlockX = out;
+            dcBlockY = dcOut;
+
+            waveformBuffer.write (dcOut);
+            buffer.setSample (0, sample, dcOut);
         }
         else
         {
-            // Classic engine path
+            // Classic engine path — per-channel stereo panning
             voiceManager.tickPortamento();
 
             if (pitchMult != 1.0f)
                 voiceManager.applyPitchMultiplier (pitchMult);
 
-            out = apu.process() * lfo.getVolumeMultiplier();
+            float chOut[8];
+            apu.processIndividual (chOut);
+
+            float volMult = lfo.getVolumeMultiplier();
+
+            // Read pan values
+            float pans[8] = {
+                p1PanParam->load(), p2PanParam->load(), triPanParam->load(),
+                noisePanParam->load(), dpcmPanParam->load(),
+                vrc6P1PanParam->load(), vrc6P2PanParam->load(), vrc6SawPanParam->load()
+            };
+
+            // Constant-power pan law and sum to L/R
+            static constexpr float piOver4 = 3.14159265f * 0.25f;
+            float sumL = 0.0f, sumR = 0.0f;
+            for (int ch = 0; ch < 8; ++ch)
+            {
+                float angle = (pans[ch] + 1.0f) * piOver4;
+                sumL += chOut[ch] * std::cos (angle);
+                sumR += chOut[ch] * std::sin (angle);
+            }
+
+            sumL *= volMult;
+            sumR *= volMult;
+
+            // DC blocking filter (on left channel for waveform display)
+            float dcOut = sumL - dcBlockX + 0.995f * dcBlockY;
+            dcBlockX = sumL;
+            dcBlockY = dcOut;
+
+            waveformBuffer.write (dcOut);
+
+            buffer.setSample (0, sample, dcOut);
+            if (buffer.getNumChannels() >= 2)
+            {
+                // DC blocking filter (right channel)
+                float dcOutR = sumR - dcBlockXR + 0.995f * dcBlockYR;
+                dcBlockXR = sumR;
+                dcBlockYR = dcOutR;
+
+                buffer.setSample (1, sample, dcOutR);
+            }
         }
-
-        // DC blocking filter: removes offset
-        // y[n] = x[n] - x[n-1] + R * y[n-1], R=0.995 ≈ 16 Hz cutoff at 44.1kHz
-        float dcOut = out - dcBlockX + 0.995f * dcBlockY;
-        dcBlockX = out;
-        dcBlockY = dcOut;
-
-        waveformBuffer.write (dcOut);
-
-        buffer.setSample (0, sample, dcOut);
     }
 
     // Update per-channel activity flags (once per block)
@@ -681,19 +811,25 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         int numSamples = buffer.getNumSamples();
         static constexpr int rampLength = 512;
 
-        float* data = buffer.getWritePointer (0);
-        for (int s = 0; s < numSamples && fadeInSamplesRemaining > 0; ++s)
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
-            float gain = 0.0f;
-            if (fadeInSamplesRemaining <= rampLength)
-                gain = static_cast<float> (rampLength - fadeInSamplesRemaining) / static_cast<float> (rampLength);
+            float* data = buffer.getWritePointer (ch);
+            int remaining = fadeInSamplesRemaining;
+            for (int s = 0; s < numSamples && remaining > 0; ++s)
+            {
+                float gain = 0.0f;
+                if (remaining <= rampLength)
+                    gain = static_cast<float> (rampLength - remaining) / static_cast<float> (rampLength);
 
-            data[s] *= gain;
-            --fadeInSamplesRemaining;
+                data[s] *= gain;
+                --remaining;
+            }
         }
+        fadeInSamplesRemaining = juce::jmax (0, fadeInSamplesRemaining - buffer.getNumSamples());
     }
 
     // Block-based effects (handles mono→stereo internally)
+    effectsChain.setStereoInput (!usingModernEngine);
     effectsChain.process (buffer);
 
     // Soft limiter — prevents clipping from stacked effects

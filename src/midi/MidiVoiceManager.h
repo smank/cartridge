@@ -13,7 +13,8 @@ enum class MidiMode
 {
     Split,   // Fixed MIDI channel → APU channel mapping
     Auto,    // Round-robin across melodic channels
-    Mono     // Single channel mode
+    Mono,    // Single channel mode
+    Layer    // All enabled channels play every note (thick chiptune stacks)
 };
 
 /// Manages MIDI → APU channel routing.

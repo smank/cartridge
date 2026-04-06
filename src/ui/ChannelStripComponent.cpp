@@ -14,6 +14,7 @@ namespace
         knob.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
         knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
         knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+        knob.setPopupMenuEnabled (true);
     }
 
     void styleDetailKnob (juce::Slider& knob)
@@ -25,6 +26,7 @@ namespace
         knob.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
         knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
         knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+        knob.setPopupMenuEnabled (true);
     }
 
     void styleFader (juce::Slider& fader)
@@ -36,6 +38,7 @@ namespace
         fader.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
         fader.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
         fader.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+        fader.setPopupMenuEnabled (true);
     }
 
     void styleToggle (juce::ToggleButton& toggle, const juce::String& text)
@@ -79,8 +82,14 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
     styleLabel (nameLabel, getChannelName (type), 14.0f, nameColour);
     addAndMakeVisible (nameLabel);
 
+    // Pan knob — every channel has one
+    styleKnob (panKnob);
+    panKnob.setTooltip ("Stereo pan position (L/R)");
+    addAndMakeVisible (panKnob);
+
     // Mix fader — every channel has one
     styleFader (mixFader);
+    mixFader.setTooltip ("Channel mix level (0-100%)");
     addAndMakeVisible (mixFader);
 
     // Details button styling
@@ -93,6 +102,25 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
         detailsVisible = detailsButton.getToggleState();
         resized();
     };
+
+    // Wire up pan knob attachment based on channel type
+    {
+        const char* panID = nullptr;
+        switch (type)
+        {
+            case ChannelType::Pulse1:     panID = ParamIDs::P1Pan; break;
+            case ChannelType::Pulse2:     panID = ParamIDs::P2Pan; break;
+            case ChannelType::Triangle:   panID = ParamIDs::TriPan; break;
+            case ChannelType::Noise:      panID = ParamIDs::NoisePan; break;
+            case ChannelType::Dpcm:       panID = ParamIDs::DpcmPan; break;
+            case ChannelType::Vrc6Pulse1: panID = ParamIDs::Vrc6P1Pan; break;
+            case ChannelType::Vrc6Pulse2: panID = ParamIDs::Vrc6P2Pan; break;
+            case ChannelType::Vrc6Saw:    panID = ParamIDs::Vrc6SawPan; break;
+        }
+        if (panID != nullptr)
+            panAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+                apvts, panID, panKnob);
+    }
 
     switch (type)
     {
@@ -137,6 +165,7 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
 {
     // Enable
     styleToggle (enableToggle, "On");
+    enableToggle.setTooltip ("Enable/disable this channel");
     addAndMakeVisible (enableToggle);
     enableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, prefix + "Enabled", enableToggle);
@@ -150,6 +179,7 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
     mainCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     mainCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     mainCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    mainCombo.setTooltip ("Pulse wave duty cycle (12.5%, 25%, 50%, 75%)");
     addAndMakeVisible (mainCombo);
     mainComboAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, prefix + "Duty", mainCombo);
@@ -158,6 +188,7 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
     hasTranspose = true;
     styleKnob (transposeKnob);
     transposeKnob.setTextValueSuffix (" st");
+    transposeKnob.setTooltip ("Transpose this channel in semitones (-24 to +24)");
     addAndMakeVisible (transposeKnob);
     transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "Transpose", transposeKnob);
@@ -165,40 +196,48 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
     // Volume knob
     hasVolume = true;
     styleKnob (volumeKnob);
+    volumeKnob.setTooltip ("Channel volume (0-15)");
     addAndMakeVisible (volumeKnob);
     volumeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "Volume", volumeKnob);
 
     // Details (sweep/envelope)
     hasDetails = true;
+    detailsButton.setTooltip ("Show/hide envelope and sweep controls");
     addAndMakeVisible (detailsButton);
 
     styleToggle (constVolToggle, "ConstV");
+    constVolToggle.setTooltip ("Constant volume (bypass envelope decay)");
     addChildComponent (constVolToggle);
     constVolAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, prefix + "ConstVol", constVolToggle);
 
     styleToggle (envLoopToggle, "EnvLp");
+    envLoopToggle.setTooltip ("Loop envelope (restart decay when it reaches 0)");
     addChildComponent (envLoopToggle);
     envLoopAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, prefix + "EnvLoop", envLoopToggle);
 
     styleToggle (sweepEnableToggle, "Sweep");
+    sweepEnableToggle.setTooltip ("Enable frequency sweep (pitch slides up/down)");
     addChildComponent (sweepEnableToggle);
     sweepEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, prefix + "SweepEnable", sweepEnableToggle);
 
     styleDetailKnob (sweepPeriodKnob);
+    sweepPeriodKnob.setTooltip ("Sweep period (speed of pitch change)");
     addChildComponent (sweepPeriodKnob);
     sweepPeriodAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "SweepPeriod", sweepPeriodKnob);
 
     styleToggle (sweepNegateToggle, "Neg");
+    sweepNegateToggle.setTooltip ("Sweep negate (pitch slides down instead of up)");
     addChildComponent (sweepNegateToggle);
     sweepNegateAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, prefix + "SweepNegate", sweepNegateToggle);
 
     styleDetailKnob (sweepShiftKnob);
+    sweepShiftKnob.setTooltip ("Sweep shift (amount of pitch change per step)");
     addChildComponent (sweepShiftKnob);
     sweepShiftAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "SweepShift", sweepShiftKnob);
@@ -212,6 +251,7 @@ void ChannelStripComponent::setupTriangleControls (juce::AudioProcessorValueTree
 {
     // Enable
     styleToggle (enableToggle, "On");
+    enableToggle.setTooltip ("Enable/disable triangle channel");
     addAndMakeVisible (enableToggle);
     enableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::TriEnabled, enableToggle);
@@ -226,6 +266,7 @@ void ChannelStripComponent::setupTriangleControls (juce::AudioProcessorValueTree
     hasTranspose = true;
     styleKnob (transposeKnob);
     transposeKnob.setTextValueSuffix (" st");
+    transposeKnob.setTooltip ("Transpose this channel in semitones (-24 to +24)");
     addAndMakeVisible (transposeKnob);
     transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::TriTranspose, transposeKnob);
@@ -237,14 +278,17 @@ void ChannelStripComponent::setupTriangleControls (juce::AudioProcessorValueTree
 
     // Details (linear counter)
     hasDetails = true;
+    detailsButton.setTooltip ("Show/hide linear counter controls");
     addAndMakeVisible (detailsButton);
 
     styleDetailKnob (linearReloadKnob);
+    linearReloadKnob.setTooltip ("Linear counter reload value (note duration)");
     addChildComponent (linearReloadKnob);
     linearReloadAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::TriLinearReload, linearReloadKnob);
 
     styleToggle (linearControlToggle, "LinCtrl");
+    linearControlToggle.setTooltip ("Linear counter control (halt length counter)");
     addChildComponent (linearControlToggle);
     linearControlAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::TriLinearControl, linearControlToggle);
@@ -258,6 +302,7 @@ void ChannelStripComponent::setupNoiseControls (juce::AudioProcessorValueTreeSta
 {
     // Enable
     styleToggle (enableToggle, "On");
+    enableToggle.setTooltip ("Enable/disable noise channel");
     addAndMakeVisible (enableToggle);
     enableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::NoiseEnabled, enableToggle);
@@ -269,6 +314,7 @@ void ChannelStripComponent::setupNoiseControls (juce::AudioProcessorValueTreeSta
     mainCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     mainCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     mainCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    mainCombo.setTooltip ("Short = metallic/pitched, Long = white noise");
     addAndMakeVisible (mainCombo);
     mainComboAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::NoiseMode, mainCombo);
@@ -276,6 +322,7 @@ void ChannelStripComponent::setupNoiseControls (juce::AudioProcessorValueTreeSta
     // Period knob
     hasMainKnob = true;
     styleKnob (noisePeriodKnob);
+    noisePeriodKnob.setTooltip ("Noise period index (pitch of noise)");
     addAndMakeVisible (noisePeriodKnob);
     noisePeriodAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::NoisePeriod, noisePeriodKnob);
@@ -283,20 +330,24 @@ void ChannelStripComponent::setupNoiseControls (juce::AudioProcessorValueTreeSta
     // Volume knob
     hasVolume = true;
     styleKnob (volumeKnob);
+    volumeKnob.setTooltip ("Noise volume (0-15)");
     addAndMakeVisible (volumeKnob);
     volumeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::NoiseVolume, volumeKnob);
 
     // Details (envelope)
     hasDetails = true;
+    detailsButton.setTooltip ("Show/hide envelope controls");
     addAndMakeVisible (detailsButton);
 
     styleToggle (constVolToggle, "ConstV");
+    constVolToggle.setTooltip ("Constant volume (bypass envelope decay)");
     addChildComponent (constVolToggle);
     constVolAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::NoiseConstVol, constVolToggle);
 
     styleToggle (envLoopToggle, "EnvLp");
+    envLoopToggle.setTooltip ("Loop envelope (restart decay when it reaches 0)");
     addChildComponent (envLoopToggle);
     envLoopAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::NoiseEnvLoop, envLoopToggle);
@@ -310,6 +361,7 @@ void ChannelStripComponent::setupDpcmControls (juce::AudioProcessorValueTreeStat
 {
     // Enable
     styleToggle (enableToggle, "On");
+    enableToggle.setTooltip ("Enable/disable DPCM sample channel");
     addAndMakeVisible (enableToggle);
     enableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::DpcmEnabled, enableToggle);
@@ -318,6 +370,7 @@ void ChannelStripComponent::setupDpcmControls (juce::AudioProcessorValueTreeStat
     hasMainKnob = true;
     hasMainCombo = false;
     styleKnob (mainKnob);
+    mainKnob.setTooltip ("DPCM playback rate index");
     addAndMakeVisible (mainKnob);
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::DpcmRate, mainKnob);
@@ -329,9 +382,11 @@ void ChannelStripComponent::setupDpcmControls (juce::AudioProcessorValueTreeStat
 
     // Details (loop toggle)
     hasDetails = true;
+    detailsButton.setTooltip ("Show/hide DPCM loop control");
     addAndMakeVisible (detailsButton);
 
     styleToggle (dpcmLoopToggle, "Loop");
+    dpcmLoopToggle.setTooltip ("Loop DPCM sample playback");
     addChildComponent (dpcmLoopToggle);
     dpcmLoopAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::DpcmLoop, dpcmLoopToggle);
@@ -344,12 +399,18 @@ void ChannelStripComponent::setupDpcmControls (juce::AudioProcessorValueTreeStat
 void ChannelStripComponent::setupVrc6PulseControls (const juce::String& prefix,
                                                     juce::AudioProcessorValueTreeState& apvts)
 {
-    // No enable toggle for VRC6 sub-channels (the whole VRC6 enable is global)
+    // Individual enable toggle for this VRC6 channel
+    styleToggle (enableToggle, "On");
+    enableToggle.setTooltip ("Enable/disable this VRC6 channel");
+    addAndMakeVisible (enableToggle);
+    enableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        apvts, prefix + "Enabled", enableToggle);
 
     // Duty knob (0–7)
     hasMainKnob = true;
     hasMainCombo = false;
     styleKnob (mainKnob);
+    mainKnob.setTooltip ("VRC6 pulse duty cycle (0-7, 8 levels)");
     addAndMakeVisible (mainKnob);
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "Duty", mainKnob);
@@ -358,6 +419,7 @@ void ChannelStripComponent::setupVrc6PulseControls (const juce::String& prefix,
     hasTranspose = true;
     styleKnob (transposeKnob);
     transposeKnob.setTextValueSuffix (" st");
+    transposeKnob.setTooltip ("Transpose this channel in semitones (-24 to +24)");
     addAndMakeVisible (transposeKnob);
     transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "Transpose", transposeKnob);
@@ -365,6 +427,7 @@ void ChannelStripComponent::setupVrc6PulseControls (const juce::String& prefix,
     // Volume knob
     hasVolume = true;
     styleKnob (volumeKnob);
+    volumeKnob.setTooltip ("VRC6 pulse volume (0-15)");
     addAndMakeVisible (volumeKnob);
     volumeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, prefix + "Volume", volumeKnob);
@@ -379,12 +442,18 @@ void ChannelStripComponent::setupVrc6PulseControls (const juce::String& prefix,
 
 void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeState& apvts)
 {
-    // No enable toggle for VRC6 sub-channels
+    // Individual enable toggle for VRC6 sawtooth
+    styleToggle (enableToggle, "On");
+    enableToggle.setTooltip ("Enable/disable VRC6 sawtooth channel");
+    addAndMakeVisible (enableToggle);
+    enableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        apvts, ParamIDs::Vrc6SawEnabled, enableToggle);
 
     // Rate knob
     hasMainKnob = true;
     hasMainCombo = false;
     styleKnob (mainKnob);
+    mainKnob.setTooltip ("VRC6 sawtooth accumulator rate (0-63)");
     addAndMakeVisible (mainKnob);
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::Vrc6SawRate, mainKnob);
@@ -393,6 +462,7 @@ void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeS
     hasTranspose = true;
     styleKnob (transposeKnob);
     transposeKnob.setTextValueSuffix (" st");
+    transposeKnob.setTooltip ("Transpose this channel in semitones (-24 to +24)");
     addAndMakeVisible (transposeKnob);
     transposeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::Vrc6SawTranspose, transposeKnob);
@@ -495,6 +565,7 @@ void ChannelStripComponent::paint (juce::Graphics& g)
 
     if (hasTranspose)  drawLabel ("TRANS", transposeKnob);
     if (hasVolume)     drawLabel ("VOL", volumeKnob);
+    drawLabel ("PAN", panKnob);
     drawLabel ("MIX", mixFader);
 
     // Detail section labels
@@ -655,8 +726,11 @@ void ChannelStripComponent::resized()
         }
     }
 
-    // Mix fader — fixed height at bottom, label drawn by paint() above it
+    // Pan + Mix faders at bottom, labels drawn by paint() above them
     mixFader.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
+    area.removeFromBottom (labelH);  // "MIX" label
+    panKnob.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
+    area.removeFromBottom (labelH);  // "PAN" label
 }
 
 } // namespace cart

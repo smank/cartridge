@@ -114,6 +114,10 @@ private:
     juce::Slider transposeKnob;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> transposeAttach;
 
+    // Pan knob
+    juce::Slider panKnob;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttach;
+
     // Mix fader
     juce::Slider mixFader;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttach;

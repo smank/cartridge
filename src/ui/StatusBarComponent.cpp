@@ -17,7 +17,7 @@ StatusBarComponent::StatusBarComponent (CartridgeProcessor& processor)
     };
     addAndMakeVisible (holdToggle);
 
-    versionLabel.setText ("v" JucePlugin_VersionString, juce::dontSendNotification);
+    versionLabel.setText ("by smank  |  v" JucePlugin_VersionString, juce::dontSendNotification);
     versionLabel.setFont (juce::FontOptions (13.0f));
     versionLabel.setColour (juce::Label::textColourId, Colors::textDark);
     versionLabel.setJustificationType (juce::Justification::centredRight);
@@ -27,7 +27,7 @@ StatusBarComponent::StatusBarComponent (CartridgeProcessor& processor)
 void StatusBarComponent::resized()
 {
     auto area = getLocalBounds().reduced (4, 0);
-    versionLabel.setBounds (area.removeFromRight (60));
+    versionLabel.setBounds (area.removeFromRight (140));
     holdToggle.setBounds (area.removeFromRight (70));
 }
 

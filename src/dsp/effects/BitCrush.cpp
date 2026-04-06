@@ -18,11 +18,12 @@ void BitCrush::process (juce::AudioBuffer<float>& buffer)
     if (! enabled)
         return;
 
-    auto* data = buffer.getWritePointer (0);
     const int numSamples = buffer.getNumSamples();
-
+    const int numChannels = buffer.getNumChannels();
     const float levels = cachedLevels;
 
+    // Process channel 0 with hold counter (drives sample-rate reduction)
+    auto* data0 = buffer.getWritePointer (0);
     for (int i = 0; i < numSamples; ++i)
     {
         holdCounter += 1.0f;
@@ -30,11 +31,21 @@ void BitCrush::process (juce::AudioBuffer<float>& buffer)
         if (holdCounter >= rateReduce)
         {
             holdCounter -= rateReduce;
-            // Quantize to bit depth
-            holdSample = std::round (data[i] * levels) / levels;
+            holdSample = std::round (data0[i] * levels) / levels;
         }
 
-        data[i] = data[i] + mix * (holdSample - data[i]);
+        data0[i] = data0[i] + mix * (holdSample - data0[i]);
+    }
+
+    // Process additional channels (bit-crush only, no rate reduction state)
+    for (int ch = 1; ch < numChannels; ++ch)
+    {
+        auto* data = buffer.getWritePointer (ch);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            float crushed = std::round (data[i] * levels) / levels;
+            data[i] = data[i] + mix * (crushed - data[i]);
+        }
     }
 }
 

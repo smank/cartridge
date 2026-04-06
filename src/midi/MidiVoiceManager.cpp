@@ -222,6 +222,17 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
 
         noteOnChannel (candidates[chosen], note, vol, bendSemitones);
     }
+    else if (mode == MidiMode::Layer)
+    {
+        // Layer mode: every enabled melodic channel plays the same note
+        static constexpr int melodicSlots[] = { 0, 1, 2, 5, 6, 7 };
+        for (int s : melodicSlots)
+        {
+            if (! channelEnabled[s]) continue;
+            if (s >= 5 && ! vrc6Available) continue;
+            noteOnChannel (s, note, vol, bendSemitones);
+        }
+    }
 }
 
 void MidiVoiceManager::handleNoteOff (int channel, int note)
@@ -298,8 +309,9 @@ void MidiVoiceManager::handleNoteOff (int channel, int note)
             activeNotes[0] = -1;
         }
     }
-    else if (mode == MidiMode::Auto)
+    else if (mode == MidiMode::Auto || mode == MidiMode::Layer)
     {
+        // Both Auto and Layer: release any channel playing this note
         if (activeNotes[0] == note) { apuPtr->pulse1().noteOff();    activeNotes[0] = -1; }
         if (activeNotes[1] == note) { apuPtr->pulse2().noteOff();    activeNotes[1] = -1; }
         if (activeNotes[2] == note) { apuPtr->triangle().noteOff();  activeNotes[2] = -1; }
@@ -353,7 +365,7 @@ void MidiVoiceManager::handlePitchBend (int channel, int bendValue)
             apuPtr->pulse1().setFrequency (freq);
         }
     }
-    else if (mode == MidiMode::Auto)
+    else if (mode == MidiMode::Auto || mode == MidiMode::Layer)
     {
         auto updateIfActive = [&] (int idx, auto& ch)
         {

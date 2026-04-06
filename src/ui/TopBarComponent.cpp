@@ -13,6 +13,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     presetCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     populatePresets();
     presetCombo.onChange = [this] { selectPreset (presetCombo.getSelectedId() - 1); };
+    presetCombo.setTooltip ("Select preset (Left/Right arrows to navigate)");
     addAndMakeVisible (presetCombo);
 
     // Prev/Next buttons
@@ -26,6 +27,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
 
     prevButton.onClick = [this] { navigatePreset (-1); };
     nextButton.onClick = [this] { navigatePreset (1); };
+    prevButton.setTooltip ("Previous preset");
+    nextButton.setTooltip ("Next preset");
     addAndMakeVisible (prevButton);
     addAndMakeVisible (nextButton);
 
@@ -58,6 +61,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
                 delete dlg;
             }), false);
     };
+    saveButton.setTooltip ("Save current settings as user preset");
     addAndMakeVisible (saveButton);
 
     // Import button
@@ -90,6 +94,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
                 }
             });
     };
+    importButton.setTooltip ("Import preset or bank from file");
     addAndMakeVisible (importButton);
 
     // Export button
@@ -118,12 +123,46 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
                     destFile);
             });
     };
+    exportButton.setTooltip ("Export current preset to file");
     addAndMakeVisible (exportButton);
+
+    // Delete button
+    styleBtn (deleteButton);
+    deleteButton.setTooltip ("Delete selected user preset");
+    deleteButton.onClick = [this]
+    {
+        int idx = presetCombo.getSelectedId() - 1;
+        if (processorRef.getPresetManager().isFactoryPreset (idx))
+            return;
+
+        auto* dlg = new juce::AlertWindow ("Delete Preset",
+            "Delete \"" + presetCombo.getText() + "\"?",
+            juce::MessageBoxIconType::WarningIcon);
+        dlg->addButton ("Delete", 1);
+        dlg->addButton ("Cancel", 0);
+        dlg->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
+        dlg->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
+        dlg->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
+
+        dlg->enterModalState (true, juce::ModalCallbackFunction::create (
+            [this, dlg, idx] (int result)
+            {
+                if (result == 1)
+                {
+                    processorRef.getPresetManager().deleteUserPreset (idx);
+                    populatePresets();
+                    selectPreset (0);
+                }
+                delete dlg;
+            }), false);
+    };
+    addAndMakeVisible (deleteButton);
 
     // Panic button
     panicButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
     panicButton.setColour (juce::TextButton::textColourOffId, Colors::fxBright);
     panicButton.onClick = [this] { processorRef.getKeyboardState().allNotesOff (0); };
+    panicButton.setTooltip ("Stop all notes (Space)");
     addAndMakeVisible (panicButton);
 
     // ─── Master Volume ───────────────────────────────────────────────────
@@ -133,6 +172,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     masterVolSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (masterVolSlider);
     masterVolSlider.setPopupDisplayEnabled (true, false, this);
+    masterVolSlider.setPopupMenuEnabled (true);
+    masterVolSlider.setTooltip ("Master output volume");
     masterVolAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::MasterVolume, masterVolSlider);
 
@@ -148,6 +189,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     masterTuneSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (masterTuneSlider);
     masterTuneSlider.setPopupDisplayEnabled (true, false, this);
+    masterTuneSlider.setPopupMenuEnabled (true);
+    masterTuneSlider.setTooltip ("Master tuning offset in cents");
     masterTuneAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::MasterTune, masterTuneSlider);
 
@@ -159,6 +202,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── Region Combo ────────────────────────────────────────────────────
     regionCombo.addItem ("NTSC", 1);
     regionCombo.addItem ("PAL", 2);
+    regionCombo.setTooltip ("Console region (affects frame timing and pitch tables)");
     regionCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     regionCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     regionCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -170,6 +214,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     midiModeCombo.addItem ("Split", 1);
     midiModeCombo.addItem ("Auto", 2);
     midiModeCombo.addItem ("Mono", 3);
+    midiModeCombo.addItem ("Layer", 4);
+    midiModeCombo.setTooltip ("Split = per-channel MIDI, Auto = round-robin, Mono = single voice, Layer = all channels play every note");
     midiModeCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     midiModeCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     midiModeCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -184,6 +230,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     velocitySensSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (velocitySensSlider);
     velocitySensSlider.setPopupDisplayEnabled (true, false, this);
+    velocitySensSlider.setPopupMenuEnabled (true);
+    velocitySensSlider.setTooltip ("MIDI velocity sensitivity (0 = fixed, 1 = full range)");
     velocitySensAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::VelocitySens, velocitySensSlider);
 
@@ -199,6 +247,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     pitchBendSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (pitchBendSlider);
     pitchBendSlider.setPopupDisplayEnabled (true, false, this);
+    pitchBendSlider.setPopupMenuEnabled (true);
+    pitchBendSlider.setTooltip ("Pitch bend range in semitones");
     pitchBendAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, ParamIDs::PitchBendRange, pitchBendSlider);
 
@@ -210,6 +260,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── Engine Mode ────────────────────────────────────────────────────
     engineModeCombo.addItem ("Classic", 1);
     engineModeCombo.addItem ("Modern", 2);
+    engineModeCombo.setTooltip ("Classic = 2A03 APU channels, Modern = polyphonic synth engine");
     engineModeCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     engineModeCombo.setColour (juce::ComboBox::textColourId, Colors::fxBright);
     engineModeCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
@@ -219,6 +270,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
 
     // ─── VRC6 Toggle ─────────────────────────────────────────────────────
     vrc6Toggle.setButtonText ("VRC6");
+    vrc6Toggle.setTooltip ("Enable VRC6 Konami expansion chip (3 extra channels)");
     vrc6Toggle.setColour (juce::ToggleButton::textColourId, Colors::orangeAccent);
     vrc6Toggle.setColour (juce::ToggleButton::tickColourId, Colors::orangeAccent);
     vrc6Toggle.onClick = [this]
@@ -231,19 +283,19 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::Vrc6Enabled, vrc6Toggle);
 
     // ─── Scale ComboBox ────────────────────────────────────────────────
-    scaleCombo.addItem ("75%", 1);
-    scaleCombo.addItem ("100%", 2);
-    scaleCombo.addItem ("125%", 3);
-    scaleCombo.addItem ("150%", 4);
-    scaleCombo.setSelectedId (2, juce::dontSendNotification);
+    scaleCombo.addItem ("100%", 1);
+    scaleCombo.addItem ("125%", 2);
+    scaleCombo.addItem ("150%", 3);
+    scaleCombo.setTooltip ("UI scale factor");
+    scaleCombo.setSelectedId (1, juce::dontSendNotification);
     scaleCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
     scaleCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
     scaleCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     scaleCombo.onChange = [this]
     {
-        static constexpr float scales[] = { 0.75f, 1.0f, 1.25f, 1.5f };
+        static constexpr float scales[] = { 1.0f, 1.25f, 1.5f };
         int idx = scaleCombo.getSelectedId() - 1;
-        if (idx >= 0 && idx < 4 && onScaleChanged)
+        if (idx >= 0 && idx < 3 && onScaleChanged)
             onScaleChanged (scales[idx]);
     };
     addAndMakeVisible (scaleCombo);
@@ -251,6 +303,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── MIDI Info Button ────────────────────────────────────────────────
     midiInfoButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
     midiInfoButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    midiInfoButton.setTooltip ("Show MIDI CC mapping reference");
     midiInfoButton.onClick = [this]
     {
         juce::String info =
@@ -291,20 +344,45 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
             }
         }
 
+        info += "\n\nTo learn a CC: click Learn 1-4, then turn a MIDI knob.";
+
         auto* popup = new juce::AlertWindow ("MIDI CC Mappings", "", juce::MessageBoxIconType::NoIcon);
         popup->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
         popup->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
         popup->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
         popup->addTextBlock (info);
+        popup->addButton ("Learn 1", 1);
+        popup->addButton ("Learn 2", 2);
+        popup->addButton ("Learn 3", 3);
+        popup->addButton ("Learn 4", 4);
         popup->addButton ("OK", 0);
         popup->enterModalState (true, juce::ModalCallbackFunction::create (
-            [popup] (int) { delete popup; }), false);
+            [this, popup] (int result)
+            {
+                if (result >= 1 && result <= 4)
+                    processorRef.setMidiLearnSlot (result - 1);
+                delete popup;
+            }), false);
     };
     addAndMakeVisible (midiInfoButton);
+
+    // ─── Audio/MIDI Settings (Standalone only) ──────────────────────────
+    audioSettingsButton.setButtonText ("Settings");
+    audioSettingsButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
+    audioSettingsButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    audioSettingsButton.setTooltip ("Audio & MIDI device settings");
+    audioSettingsButton.onClick = [this]
+    {
+        if (onAudioSettings)
+            onAudioSettings();
+    };
+    // Starts hidden; editor shows it if running standalone
+    audioSettingsButton.setVisible (false);
 
     // ─── A/B Comparison ─────────────────────────────────────────────────
     styleBtn(abButton);
     abButton.setColour(juce::TextButton::textColourOffId, Colors::fxBright);
+    abButton.setTooltip ("Toggle A/B comparison (stores two parameter states)");
     abButton.onClick = [this]
     {
         processorRef.abCompare.toggle(processorRef.getApvts());
@@ -430,6 +508,11 @@ void TopBarComponent::timerCallback()
             onPresetChanged();
     }
 
+    // Update delete button enabled state
+    bool isFactory = processorRef.getPresetManager().isFactoryPreset (current);
+    deleteButton.setEnabled (!isFactory);
+    deleteButton.setAlpha (isFactory ? 0.4f : 1.0f);
+
     // Only fire VRC6 toggle callback when state actually changes
     bool vrc6On = vrc6Toggle.getToggleState();
     if (vrc6On != lastVrc6State)
@@ -479,25 +562,29 @@ void TopBarComponent::resized()
     // ─── Row 1: Preset navigation + A/B ─────────────────────────────────
     auto row1 = bounds.removeFromTop (rowH).reduced (0, 1);
 
-    prevButton.setBounds (row1.removeFromLeft (26));
-    row1.removeFromLeft (2);
-    nextButton.setBounds (row1.removeFromLeft (26));
-    row1.removeFromLeft (4);
-    saveButton.setBounds (row1.removeFromLeft (40));
-    row1.removeFromLeft (2);
-    importButton.setBounds (row1.removeFromLeft (48));
-    row1.removeFromLeft (2);
-    exportButton.setBounds (row1.removeFromLeft (48));
-    row1.removeFromLeft (6);
+    // Left: [<][>] [===preset===]  then action buttons spread across remaining space
+    {
+        // Nav arrows side by side (no gap between them)
+        prevButton.setBounds (row1.removeFromLeft (24));
+        nextButton.setBounds (row1.removeFromLeft (24));
+        row1.removeFromLeft (4);
 
-    // A/B and Panic on the right of row 1
-    abButton.setBounds (row1.removeFromRight (30));
-    row1.removeFromRight (4);
-    panicButton.setBounds (row1.removeFromRight (46));
-    row1.removeFromRight (6);
+        // Preset dropdown — wider, top-left anchor
+        presetCombo.setBounds (row1.removeFromLeft (280));
+        row1.removeFromLeft (8);
 
-    // Preset combo fills remaining space
-    presetCombo.setBounds (row1);
+        // Action buttons fill remaining space equally with small gaps
+        constexpr int numBtns = 6;
+        constexpr int btnGap = 4;
+        int btnW = (row1.getWidth() - btnGap * (numBtns - 1)) / numBtns;
+
+        saveButton.setBounds   (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
+        importButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
+        exportButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
+        deleteButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
+        panicButton.setBounds  (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
+        abButton.setBounds     (row1);
+    }
 
     // ─── Row 2: Engine, Region, MIDI mode, VRC6, Scale, MIDI info ───────
     auto row2 = bounds.removeFromTop (rowH).reduced (0, 1);
@@ -511,6 +598,11 @@ void TopBarComponent::resized()
     vrc6Toggle.setBounds (row2.removeFromLeft (60));
 
     // Right side of row 2
+    if (audioSettingsButton.isVisible())
+    {
+        audioSettingsButton.setBounds (row2.removeFromRight (62));
+        row2.removeFromRight (4);
+    }
     midiInfoButton.setBounds (row2.removeFromRight (42));
     row2.removeFromRight (4);
     scaleCombo.setBounds (row2.removeFromRight (65));

@@ -72,6 +72,12 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dlTimeAttach, dlFeedbackAttach, dlMixAttach;
     juce::Label dlTimeLabel, dlFeedbackLabel, dlMixLabel;
 
+    // Delay tempo sync
+    juce::ToggleButton dlSyncToggle;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> dlSyncAttach;
+    juce::ComboBox dlSyncDiv;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> dlSyncDivAttach;
+
     // ─── Reverb ────────────────────────────────────────────────────────
     juce::ToggleButton rvEnable;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> rvEnableAttach;

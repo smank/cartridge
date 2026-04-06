@@ -41,6 +41,12 @@ public:
     /// Process one sample. Returns mono float in [-1, 1].
     float process();
 
+    /// Process one sample, returning per-channel outputs.
+    /// out[0]=pulse1, out[1]=pulse2, out[2]=tri, out[3]=noise, out[4]=dpcm,
+    /// out[5]=vrc6p1, out[6]=vrc6p2, out[7]=vrc6saw
+    /// Each channel has its nonlinear characteristic applied individually.
+    void processIndividual (float out[8]);
+
     /// Master volume (0.0–1.0)
     void setMasterVolume (float vol)  { masterVolume = vol; }
 

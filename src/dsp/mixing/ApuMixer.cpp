@@ -59,4 +59,40 @@ float ApuMixer::mixFloat (float pulse1, float pulse2,
     return mix (p1, p2, tri, noi, dpc);
 }
 
+void ApuMixer::mixIndividual (float pulse1, float pulse2,
+                              float triangle, float noise, float dpcm,
+                              float out[5]) const
+{
+    const auto& tables = getMixerTables();
+
+    auto scaleChannel = [] (float val, float maxVal) -> uint8_t {
+        float scaled = (val + 1.0f) * 0.5f * maxVal;
+        return static_cast<uint8_t> (std::clamp (scaled, 0.0f, maxVal));
+    };
+
+    // Scale float to integer ranges and apply mix levels
+    float p1f = static_cast<float> (scaleChannel (pulse1, 15.0f)) * pulse1MixLevel;
+    float p2f = static_cast<float> (scaleChannel (pulse2, 15.0f)) * pulse2MixLevel;
+    float trif = static_cast<float> (scaleChannel (triangle, 15.0f)) * triangleMixLevel;
+    float noif = std::clamp (noise * 15.0f, 0.0f, 15.0f) * noiseMixLevel;
+    float dpcf = static_cast<float> (scaleChannel (dpcm, 127.0f)) * dpcmMixLevel;
+
+    // Per-channel through DAC curves (each channel solo'd through the table)
+    int p1idx = std::clamp (static_cast<int> (p1f), 0, 30);
+    out[0] = (tables.pulseTable[static_cast<size_t> (p1idx)] - 0.5f * (p1idx > 0 ? 1.0f : 0.0f)) * 2.0f;
+
+    int p2idx = std::clamp (static_cast<int> (p2f), 0, 30);
+    out[1] = (tables.pulseTable[static_cast<size_t> (p2idx)] - 0.5f * (p2idx > 0 ? 1.0f : 0.0f)) * 2.0f;
+
+    // TND channels each go through the tnd curve individually
+    int triIdx = std::clamp (static_cast<int> (3.0f * trif), 0, 202);
+    out[2] = (tables.tndTable[static_cast<size_t> (triIdx)]) * 2.0f;
+
+    int noiIdx = std::clamp (static_cast<int> (2.0f * noif), 0, 202);
+    out[3] = (tables.tndTable[static_cast<size_t> (noiIdx)]) * 2.0f;
+
+    int dpcIdx = std::clamp (static_cast<int> (dpcf), 0, 202);
+    out[4] = (tables.tndTable[static_cast<size_t> (dpcIdx)]) * 2.0f;
+}
+
 } // namespace cart

@@ -65,6 +65,12 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> arpRateAttach, arpOctavesAttach, arpGateAttach;
     juce::Label arpRateLabel, arpOctavesLabel, arpGateLabel;
 
+    // Arp tempo sync
+    juce::ToggleButton arpSyncToggle;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> arpSyncAttach;
+    juce::ComboBox arpSyncDiv;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> arpSyncDivAttach;
+
     // ─── DPCM ───────────────────────────────────────────────────────────
     juce::ComboBox dpcmSample;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> dpcmSampleAttach;

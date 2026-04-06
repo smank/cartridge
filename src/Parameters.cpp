@@ -133,6 +133,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     params.push_back (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamIDs::Vrc6Enabled, 1 }, "VRC6 Expansion Enabled", false));
 
+    params.push_back (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamIDs::Vrc6P1Enabled, 1 }, "VRC6 Pulse 1 Enabled", true));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamIDs::Vrc6P2Enabled, 1 }, "VRC6 Pulse 2 Enabled", true));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (
+        juce::ParameterID { ParamIDs::Vrc6SawEnabled, 1 }, "VRC6 Sawtooth Enabled", true));
+
     params.push_back (std::make_unique<juce::AudioParameterInt> (
         juce::ParameterID { ParamIDs::Vrc6P1Duty, 1 }, "VRC6 Pulse 1 Duty", 0, 7, 4));
 
@@ -201,7 +208,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     params.push_back (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamIDs::MidiMode, 1 },
         "MIDI Mode",
-        juce::StringArray { "Split", "Auto", "Mono" },
+        juce::StringArray { "Split", "Auto", "Mono", "Layer" },
         1));
 
     // ─── Engine Mode ──────────────────────────────────────────────────
@@ -445,6 +452,40 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
         "Tuning System",
         juce::StringArray { "Equal", "Just", "Pythagorean", "Meantone" },
         0));
+
+    // ─── Tempo Sync ────────────────────────────────────────────────────
+    juce::StringArray syncDivisions { "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T" };
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID { ParamIDs::ArpSyncEnabled, 1 }, "Arp Sync Enabled", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID { ParamIDs::ArpSyncDiv, 1 }, "Arp Sync Division",
+        syncDivisions, 3));  // default 1/8
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID { ParamIDs::DlSyncEnabled, 1 }, "Delay Sync Enabled", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID { ParamIDs::DlSyncDiv, 1 }, "Delay Sync Division",
+        syncDivisions, 2));  // default 1/4
+
+    // ─── Per-Channel Pan ───────────────────────────────────────────────
+    auto makePanParam = [&](const char* id, const juce::String& name)
+    {
+        params.push_back(std::make_unique<juce::AudioParameterFloat>(
+            juce::ParameterID { id, 1 }, name,
+            juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.0f));
+    };
+
+    makePanParam(ParamIDs::P1Pan,      "Pulse 1 Pan");
+    makePanParam(ParamIDs::P2Pan,      "Pulse 2 Pan");
+    makePanParam(ParamIDs::TriPan,     "Triangle Pan");
+    makePanParam(ParamIDs::NoisePan,   "Noise Pan");
+    makePanParam(ParamIDs::DpcmPan,    "DPCM Pan");
+    makePanParam(ParamIDs::Vrc6P1Pan,  "VRC6 Pulse 1 Pan");
+    makePanParam(ParamIDs::Vrc6P2Pan,  "VRC6 Pulse 2 Pan");
+    makePanParam(ParamIDs::Vrc6SawPan, "VRC6 Saw Pan");
 
     return { params.begin(), params.end() };
 }

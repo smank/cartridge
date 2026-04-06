@@ -59,6 +59,9 @@ namespace ParamIDs {
 
     // VRC6 Expansion
     inline constexpr const char* Vrc6Enabled      = "vrc6Enabled";
+    inline constexpr const char* Vrc6P1Enabled    = "vrc6P1Enabled";
+    inline constexpr const char* Vrc6P2Enabled    = "vrc6P2Enabled";
+    inline constexpr const char* Vrc6SawEnabled   = "vrc6SawEnabled";
     inline constexpr const char* Vrc6P1Duty       = "vrc6P1Duty";
     inline constexpr const char* Vrc6P1Volume     = "vrc6P1Volume";
     inline constexpr const char* Vrc6P1Mix        = "vrc6P1Mix";
@@ -163,6 +166,22 @@ namespace ParamIDs {
 
     // Tuning System
     inline constexpr const char* TuningSystem   = "tuningSystem";
+
+    // Tempo Sync
+    inline constexpr const char* ArpSyncEnabled = "arpSyncEnabled";
+    inline constexpr const char* ArpSyncDiv     = "arpSyncDiv";
+    inline constexpr const char* DlSyncEnabled  = "dlSyncEnabled";
+    inline constexpr const char* DlSyncDiv      = "dlSyncDiv";
+
+    // Per-Channel Pan
+    inline constexpr const char* P1Pan       = "p1Pan";
+    inline constexpr const char* P2Pan       = "p2Pan";
+    inline constexpr const char* TriPan      = "triPan";
+    inline constexpr const char* NoisePan    = "noisePan";
+    inline constexpr const char* DpcmPan     = "dpcmPan";
+    inline constexpr const char* Vrc6P1Pan   = "vrc6P1Pan";
+    inline constexpr const char* Vrc6P2Pan   = "vrc6P2Pan";
+    inline constexpr const char* Vrc6SawPan  = "vrc6SawPan";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

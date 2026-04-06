@@ -137,6 +137,7 @@ void ModernPanelComponent::styleKnob (juce::Slider& knob)
     knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline);
     knob.setColour (juce::Slider::textBoxTextColourId, Colors::textPrimary);
     knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    knob.setPopupMenuEnabled (true);
 }
 
 void ModernPanelComponent::makeLabel (juce::Label& label, const juce::String& text)
