@@ -163,13 +163,12 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
     }
     else if (mode == MidiMode::Auto)
     {
-        // Auto poly: smart allocation across melodic channels only
-        // Skip Noise (3) and DPCM (4) — those are percussion-only via Split mode
-        static constexpr int melodicSlots[] = { 0, 1, 2, 5, 6, 7 };
+        // Auto poly: smart allocation across all enabled channels
+        static constexpr int allocSlots[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
 
         int candidates[8];
         int numCandidates = 0;
-        for (int s : melodicSlots)
+        for (int s : allocSlots)
         {
             if (! channelEnabled[s]) continue;
             if (s >= 5 && ! vrc6Available) continue;
@@ -224,9 +223,9 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
     }
     else if (mode == MidiMode::Layer)
     {
-        // Layer mode: every enabled melodic channel plays the same note
-        static constexpr int melodicSlots[] = { 0, 1, 2, 5, 6, 7 };
-        for (int s : melodicSlots)
+        // Layer mode: every enabled channel plays the same note
+        static constexpr int allSlots[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        for (int s : allSlots)
         {
             if (! channelEnabled[s]) continue;
             if (s >= 5 && ! vrc6Available) continue;

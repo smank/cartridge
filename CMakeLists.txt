@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 if(APPLE)
-    project(Cartridge VERSION 1.7.2 LANGUAGES C CXX OBJC OBJCXX)
+    project(Cartridge VERSION 1.8.0 LANGUAGES C CXX OBJC OBJCXX)
 else()
-    project(Cartridge VERSION 1.7.2 LANGUAGES C CXX)
+    project(Cartridge VERSION 1.8.0 LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -22,6 +22,8 @@ juce_add_plugin(Cartridge
     PLUGIN_CODE             Crt1
     FORMATS                 VST3 AU Standalone
     PRODUCT_NAME            "Cartridge"
+    ICON_BIG                "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
+    ICON_SMALL              "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
     IS_SYNTH                TRUE
     NEEDS_MIDI_INPUT        TRUE
     NEEDS_MIDI_OUTPUT       FALSE

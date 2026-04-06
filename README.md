@@ -23,8 +23,8 @@ Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 Kona
 - **Velocity-to-filter** modulation
 
 ### MIDI
-- **4 modes** — Split (fixed channel routing), Auto (round-robin polyphony), Mono (single voice), Layer (all enabled channels play every note)
-- **Layer mode** — thick chiptune stacks: every enabled melodic channel fires on each keypress with its own timbre (e.g. P1 + P2 + Tri + VRC6 Saw)
+- **4 modes** — Split (fixed channel routing), Auto (round-robin polyphony across all enabled channels), Mono (single voice), Layer (all enabled channels play every note)
+- **Layer mode** — thick chiptune stacks: every enabled channel fires on each keypress with its own timbre (e.g. P1 + P2 + Tri + Noise + DPCM + VRC6 Saw)
 - **Split mode routing** — Ch1→Pulse 1, Ch2→Pulse 2, Ch3→Triangle, Ch10→Noise, Ch4→DPCM, Ch5→VRC6 P1, Ch6→VRC6 P2, Ch7→VRC6 Saw
 - **MIDI Learn** — right-click any custom CC knob → "Learn" → send a CC to auto-assign
 - **Pitch bend** — configurable range (1–24 semitones)
