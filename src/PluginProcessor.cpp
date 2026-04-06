@@ -268,6 +268,7 @@ void CartridgeProcessor::setCurrentProgram (int index)
 {
     currentPreset = index;
     presetManager.applyPreset (index, apvts);
+    abCompare.initialize (apvts);   // Re-sync A/B snapshots with new preset
     pendingDspReset.store (true);    // Actual reset deferred to audio thread
 }
 const juce::String CartridgeProcessor::getProgramName (int index) { return presetManager.getPresetName (index); }
@@ -863,6 +864,7 @@ void CartridgeProcessor::setStateInformation (const void* data, int sizeInBytes)
     {
         dpcmSampleManager.loadFromXml (*xmlState);
         apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+        abCompare.initialize (apvts);        // Re-sync A/B snapshots with restored state
         pendingDspReset.store (true);        // Actual reset deferred to audio thread
     }
 }
