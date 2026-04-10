@@ -9,7 +9,8 @@ namespace cart {
 float MidiVoiceManager::getAdjustedFrequency (int note, float bendSemitones, int nesChannel) const
 {
     float transposeOffset = (nesChannel >= 0 && nesChannel < 8) ? transpose[nesChannel] : 0.0f;
-    float adjustedNote = static_cast<float> (note) + bendSemitones + transposeOffset + (masterTuneCents / 100.0f);
+    float seqOffset = (nesChannel >= 0 && nesChannel < 8) ? seqPitchOffset[nesChannel] : 0.0f;
+    float adjustedNote = static_cast<float> (note) + bendSemitones + transposeOffset + seqOffset + (masterTuneCents / 100.0f);
     if (tuningTablePtr != nullptr)
         return tuningTablePtr->getFrequency (adjustedNote);
     return midiNoteToFrequency (adjustedNote);
@@ -64,6 +65,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     static_cast<uint8_t> (vol * 15.0f));
                 apuPtr->pulse1().noteOn();
                 activeNotes[0] = note;
+                if (onNoteGate) onNoteGate (0, true);
                 break;
             }
             case 2:  // Pulse 2
@@ -75,6 +77,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     static_cast<uint8_t> (vol * 15.0f));
                 apuPtr->pulse2().noteOn();
                 activeNotes[1] = note;
+                if (onNoteGate) onNoteGate (1, true);
                 break;
             }
             case 3:  // Triangle
@@ -84,6 +87,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                 apuPtr->triangle().setFrequency (porta[2].getCurrentFreq() > 0.0f ? porta[2].getCurrentFreq() : freq);
                 apuPtr->triangle().noteOn();
                 activeNotes[2] = note;
+                if (onNoteGate) onNoteGate (2, true);
                 break;
             }
             case 10: // Noise
@@ -96,6 +100,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     static_cast<uint8_t> (vol * 15.0f));
                 apuPtr->noise().noteOn();
                 activeNotes[3] = note;
+                if (onNoteGate) onNoteGate (3, true);
                 break;
             }
             case 4:  // DPCM
@@ -106,6 +111,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     apuPtr->dpcm().loadSample (getDpcmSample (mappedSample));
                 apuPtr->dpcm().noteOn();
                 activeNotes[4] = note;
+                if (onNoteGate) onNoteGate (4, true);
                 break;
             }
             case 5:  // VRC6 Pulse 1
@@ -118,6 +124,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     apuPtr->vrc6Pulse1().setVolume (static_cast<uint8_t> (vol * 15.0f));
                     apuPtr->vrc6Pulse1().noteOn (startFreq);
                     activeNotes[5] = note;
+                    if (onNoteGate) onNoteGate (5, true);
                 }
                 break;
             }
@@ -131,6 +138,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     apuPtr->vrc6Pulse2().setVolume (static_cast<uint8_t> (vol * 15.0f));
                     apuPtr->vrc6Pulse2().noteOn (startFreq);
                     activeNotes[6] = note;
+                    if (onNoteGate) onNoteGate (6, true);
                 }
                 break;
             }
@@ -143,6 +151,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     float startFreq = porta[7].getCurrentFreq() > 0.0f ? porta[7].getCurrentFreq() : freq;
                     apuPtr->vrc6Saw().noteOn (startFreq);
                     activeNotes[7] = note;
+                    if (onNoteGate) onNoteGate (7, true);
                 }
                 break;
             }
@@ -160,6 +169,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             static_cast<uint8_t> (vol * 15.0f));
         apuPtr->pulse1().noteOn();
         activeNotes[0] = note;
+        if (onNoteGate) onNoteGate (0, true);
     }
     else if (mode == MidiMode::Auto)
     {
@@ -238,72 +248,34 @@ void MidiVoiceManager::handleNoteOff (int channel, int note)
 {
     if (mode == MidiMode::Split)
     {
+        auto noteOffWithGate = [&] (int ch, auto& channel)
+        {
+            if (activeNotes[ch] == note)
+            {
+                if (onNoteGate) onNoteGate (ch, false);
+                channel.noteOff();
+                activeNotes[ch] = -1;
+            }
+        };
+
         switch (channel)
         {
-            case 1:
-                if (activeNotes[0] == note)
-                {
-                    apuPtr->pulse1().noteOff();
-                    activeNotes[0] = -1;
-                }
-                break;
-            case 2:
-                if (activeNotes[1] == note)
-                {
-                    apuPtr->pulse2().noteOff();
-                    activeNotes[1] = -1;
-                }
-                break;
-            case 3:
-                if (activeNotes[2] == note)
-                {
-                    apuPtr->triangle().noteOff();
-                    activeNotes[2] = -1;
-                }
-                break;
-            case 10:
-                if (activeNotes[3] == note)
-                {
-                    apuPtr->noise().noteOff();
-                    activeNotes[3] = -1;
-                }
-                break;
-            case 4:
-                if (activeNotes[4] == note)
-                {
-                    apuPtr->dpcm().noteOff();
-                    activeNotes[4] = -1;
-                }
-                break;
-            case 5:
-                if (vrc6Available && activeNotes[5] == note)
-                {
-                    apuPtr->vrc6Pulse1().noteOff();
-                    activeNotes[5] = -1;
-                }
-                break;
-            case 6:
-                if (vrc6Available && activeNotes[6] == note)
-                {
-                    apuPtr->vrc6Pulse2().noteOff();
-                    activeNotes[6] = -1;
-                }
-                break;
-            case 7:
-                if (vrc6Available && activeNotes[7] == note)
-                {
-                    apuPtr->vrc6Saw().noteOff();
-                    activeNotes[7] = -1;
-                }
-                break;
-            default:
-                break;
+            case 1:  noteOffWithGate (0, apuPtr->pulse1());   break;
+            case 2:  noteOffWithGate (1, apuPtr->pulse2());   break;
+            case 3:  noteOffWithGate (2, apuPtr->triangle()); break;
+            case 10: noteOffWithGate (3, apuPtr->noise());    break;
+            case 4:  noteOffWithGate (4, apuPtr->dpcm());     break;
+            case 5:  if (vrc6Available) noteOffWithGate (5, apuPtr->vrc6Pulse1()); break;
+            case 6:  if (vrc6Available) noteOffWithGate (6, apuPtr->vrc6Pulse2()); break;
+            case 7:  if (vrc6Available) noteOffWithGate (7, apuPtr->vrc6Saw());    break;
+            default: break;
         }
     }
     else if (mode == MidiMode::Mono)
     {
         if (activeNotes[0] == note)
         {
+            if (onNoteGate) onNoteGate (0, false);
             apuPtr->pulse1().noteOff();
             activeNotes[0] = -1;
         }
@@ -311,16 +283,25 @@ void MidiVoiceManager::handleNoteOff (int channel, int note)
     else if (mode == MidiMode::Auto || mode == MidiMode::Layer)
     {
         // Both Auto and Layer: release any channel playing this note
-        if (activeNotes[0] == note) { apuPtr->pulse1().noteOff();    activeNotes[0] = -1; }
-        if (activeNotes[1] == note) { apuPtr->pulse2().noteOff();    activeNotes[1] = -1; }
-        if (activeNotes[2] == note) { apuPtr->triangle().noteOff();  activeNotes[2] = -1; }
-        if (activeNotes[3] == note) { apuPtr->noise().noteOff();     activeNotes[3] = -1; }
-        if (activeNotes[4] == note) { apuPtr->dpcm().noteOff();      activeNotes[4] = -1; }
+        auto offIf = [&] (int ch, auto& channel)
+        {
+            if (activeNotes[ch] == note)
+            {
+                if (onNoteGate) onNoteGate (ch, false);
+                channel.noteOff();
+                activeNotes[ch] = -1;
+            }
+        };
+        offIf (0, apuPtr->pulse1());
+        offIf (1, apuPtr->pulse2());
+        offIf (2, apuPtr->triangle());
+        offIf (3, apuPtr->noise());
+        offIf (4, apuPtr->dpcm());
         if (vrc6Available)
         {
-            if (activeNotes[5] == note) { apuPtr->vrc6Pulse1().noteOff(); activeNotes[5] = -1; }
-            if (activeNotes[6] == note) { apuPtr->vrc6Pulse2().noteOff(); activeNotes[6] = -1; }
-            if (activeNotes[7] == note) { apuPtr->vrc6Saw().noteOff();    activeNotes[7] = -1; }
+            offIf (5, apuPtr->vrc6Pulse1());
+            offIf (6, apuPtr->vrc6Pulse2());
+            offIf (7, apuPtr->vrc6Saw());
         }
     }
 }
@@ -385,6 +366,12 @@ void MidiVoiceManager::handlePitchBend (int channel, int bendValue)
 
 void MidiVoiceManager::handleAllNotesOff()
 {
+    for (int i = 0; i < 8; ++i)
+    {
+        if (activeNotes[i] >= 0 && onNoteGate)
+            onNoteGate (i, false);
+    }
+
     if (activeNotes[0] >= 0) { apuPtr->pulse1().noteOff();    activeNotes[0] = -1; }
     if (activeNotes[1] >= 0) { apuPtr->pulse2().noteOff();    activeNotes[1] = -1; }
     if (activeNotes[2] >= 0) { apuPtr->triangle().noteOff();  activeNotes[2] = -1; }
@@ -462,6 +449,25 @@ void MidiVoiceManager::applyPitchMultiplier (float multiplier)
     }
 }
 
+void MidiVoiceManager::recomputeFrequency (int ch)
+{
+    if (apuPtr == nullptr || ch < 0 || ch >= 8 || activeNotes[ch] < 0)
+        return;
+
+    float freq = getAdjustedFrequency (activeNotes[ch], 0.0f, ch);
+
+    switch (ch)
+    {
+        case 0: apuPtr->pulse1().setFrequency (freq); break;
+        case 1: apuPtr->pulse2().setFrequency (freq); break;
+        case 2: apuPtr->triangle().setFrequency (freq); break;
+        case 5: if (vrc6Available) apuPtr->vrc6Pulse1().setFrequency (freq); break;
+        case 6: if (vrc6Available) apuPtr->vrc6Pulse2().setFrequency (freq); break;
+        case 7: if (vrc6Available) apuPtr->vrc6Saw().setFrequency (freq); break;
+        default: break;
+    }
+}
+
 void MidiVoiceManager::noteOnChannel (int ch, int note, float vol, float bendSemitones)
 {
     float freq = getAdjustedFrequency (note, bendSemitones, ch);
@@ -520,10 +526,12 @@ void MidiVoiceManager::noteOnChannel (int ch, int note, float vol, float bendSem
     }
     activeNotes[ch] = note;
     noteAge[ch] = ++noteAgeCounter;
+    if (onNoteGate) onNoteGate (ch, true);
 }
 
 void MidiVoiceManager::noteOffChannel (int ch)
 {
+    if (onNoteGate) onNoteGate (ch, false);
     switch (ch)
     {
         case 0: apuPtr->pulse1().noteOff();    break;

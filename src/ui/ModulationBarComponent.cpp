@@ -1,5 +1,6 @@
 #include "ModulationBarComponent.h"
 #include "Parameters.h"
+#include "../PluginProcessor.h"
 
 namespace cart {
 
@@ -14,7 +15,7 @@ namespace
     }
 }
 
-ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeState& apvts)
+ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeState& apvts, CartridgeProcessor& proc)
 {
     // ─── LFO ────────────────────────────────────────────────────────────
     lfoEnable.setClickingTogglesState (true);
@@ -161,6 +162,41 @@ ModulationBarComponent::ModulationBarComponent (juce::AudioProcessorValueTreeSta
     };
     addChildComponent (dpcmLoadButton);
 
+    // ─── Step Sequencer ─────────────────────────────────────────────────
+    seqEnable.setClickingTogglesState (true);
+    addAndMakeVisible (seqEnable);
+    seqEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        apvts, ParamIDs::SeqEnabled, seqEnable);
+    seqEnable.setSize (0, 0);
+
+    styleKnob (seqRate);
+    seqRate.setTooltip ("Step sequencer rate in Hz");
+    addChildComponent (seqRate);
+    seqRateAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        apvts, ParamIDs::SeqRate, seqRate);
+    makeKnobLabel (seqRateLabel, "Rate");
+    addChildComponent (seqRateLabel);
+
+    seqSyncToggle.setButtonText ("Sync");
+    seqSyncToggle.setColour (juce::ToggleButton::textColourId, Colors::textSecondary);
+    seqSyncToggle.setColour (juce::ToggleButton::tickColourId, Colors::accentActive);
+    seqSyncToggle.setTooltip ("Sync step rate to host tempo");
+    addChildComponent (seqSyncToggle);
+    seqSyncAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        apvts, ParamIDs::SeqSyncEnabled, seqSyncToggle);
+
+    seqSyncDiv.addItemList ({ "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T" }, 1);
+    seqSyncDiv.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
+    seqSyncDiv.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
+    seqSyncDiv.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    seqSyncDiv.setTooltip ("Step sequencer tempo sync note division");
+    addChildComponent (seqSyncDiv);
+    seqSyncDivAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
+        apvts, ParamIDs::SeqSyncDiv, seqSyncDiv);
+
+    stepSeqGrid = std::make_unique<StepSequencerComponent> (proc);
+    addChildComponent (*stepSeqGrid);
+
     startTimerHz (15);
 }
 
@@ -176,7 +212,8 @@ void ModulationBarComponent::timerCallback()
 
 int ModulationBarComponent::getDesiredHeight() const
 {
-    return headerHeight + (expandedMod >= 0 ? detailHeight : 0);
+    if (expandedMod < 0) return headerHeight;
+    return headerHeight + (expandedMod == MOD_SEQ ? seqDetailHeight : detailHeight);
 }
 
 void ModulationBarComponent::collapseAll()
@@ -228,6 +265,9 @@ void ModulationBarComponent::setDetailVisible (int modIndex, bool visible)
         case MOD_DPCM:
             setVis ({ &dpcmSample, &dpcmSampleLabel, &dpcmLoadButton });
             break;
+        case MOD_SEQ:
+            setVis ({ &seqRate, &seqRateLabel, &seqSyncToggle, &seqSyncDiv, stepSeqGrid.get() });
+            break;
         default: break;
     }
 }
@@ -268,8 +308,8 @@ void ModulationBarComponent::mouseDown (const juce::MouseEvent& e)
     if (localX < 28 && modIndex != MOD_DPCM)
     {
         // Toggle the enable button for this mod
-        juce::ToggleButton* enableButtons[] = { &lfoEnable, &portaEnable, &arpEnable };
-        if (modIndex < 3)
+        juce::ToggleButton* enableButtons[] = { &lfoEnable, &portaEnable, &arpEnable, nullptr, &seqEnable };
+        if (modIndex < NUM_MOD && enableButtons[modIndex] != nullptr)
         {
             enableButtons[modIndex]->setToggleState (! enableButtons[modIndex]->getToggleState(),
                                                       juce::sendNotification);
@@ -293,8 +333,8 @@ void ModulationBarComponent::paint (juce::Graphics& g)
     g.fillRect (headerArea);
 
     // Draw each header section
-    const juce::String modNames[] = { "LFO", "PORTA", "ARP", "DPCM" };
-    const juce::ToggleButton* enableButtons[] = { &lfoEnable, &portaEnable, &arpEnable, nullptr };
+    const juce::String modNames[] = { "LFO", "PORTA", "ARP", "DPCM", "SEQ" };
+    const juce::ToggleButton* enableButtons[] = { &lfoEnable, &portaEnable, &arpEnable, nullptr, &seqEnable };
 
     for (int i = 0; i < NUM_MOD; ++i)
     {
@@ -434,6 +474,25 @@ void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int m
             dpcmLoadButton.setBounds (row.removeFromLeft (50).withHeight (comboH));
             break;
         }
+        case MOD_SEQ:
+        {
+            // Top controls row: Rate slider + Sync toggle + Sync division
+            auto ctrlRow = area.removeFromTop (24);
+            seqRateLabel.setJustificationType (juce::Justification::centredRight);
+            seqRateLabel.setBounds (ctrlRow.removeFromLeft (labelW));
+            ctrlRow.removeFromLeft (4);
+            seqRate.setBounds (ctrlRow.removeFromLeft (juce::jmin (200, ctrlRow.getWidth())));
+            ctrlRow.removeFromLeft (8);
+            seqSyncToggle.setBounds (ctrlRow.removeFromLeft (60));
+            ctrlRow.removeFromLeft (4);
+            seqSyncDiv.setBounds (ctrlRow.removeFromLeft (juce::jmin (80, ctrlRow.getWidth()))
+                                        .withHeight (juce::jmin (comboH, ctrlRow.getHeight())));
+
+            // Step grid fills remaining space
+            area.removeFromTop (4);
+            stepSeqGrid->setBounds (area);
+            break;
+        }
         default: break;
     }
 }
@@ -444,6 +503,7 @@ void ModulationBarComponent::resized()
     lfoEnable.setBounds (0, 0, 0, 0);
     portaEnable.setBounds (0, 0, 0, 0);
     arpEnable.setBounds (0, 0, 0, 0);
+    seqEnable.setBounds (0, 0, 0, 0);
 
     if (expandedMod >= 0)
     {

@@ -30,6 +30,9 @@ public:
     /// Callback for MIDI CC messages (ccNumber, value01)
     std::function<void(int, float)> onControlChange;
 
+    /// Callback for note gate events (noteOn = true/false)
+    std::function<void(bool)> onNoteGate;
+
 private:
     void handleNoteOn (int note, float velocity, int midiChannel = 1);
     void handleNoteOff (int note, int midiChannel = 1);

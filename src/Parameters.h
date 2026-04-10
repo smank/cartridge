@@ -182,6 +182,12 @@ namespace ParamIDs {
     inline constexpr const char* Vrc6P1Pan   = "vrc6P1Pan";
     inline constexpr const char* Vrc6P2Pan   = "vrc6P2Pan";
     inline constexpr const char* Vrc6SawPan  = "vrc6SawPan";
+
+    // Step Sequencer
+    inline constexpr const char* SeqEnabled     = "seqEnabled";
+    inline constexpr const char* SeqRate        = "seqRate";
+    inline constexpr const char* SeqSyncEnabled = "seqSyncEnabled";
+    inline constexpr const char* SeqSyncDiv     = "seqSyncDiv";
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

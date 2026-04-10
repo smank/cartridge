@@ -3,6 +3,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Colors.h"
+#include "StepSequencerComponent.h"
+
+class CartridgeProcessor;
 
 namespace cart {
 
@@ -10,7 +13,7 @@ class ModulationBarComponent : public juce::Component,
                                private juce::Timer
 {
 public:
-    ModulationBarComponent (juce::AudioProcessorValueTreeState& apvts);
+    ModulationBarComponent (juce::AudioProcessorValueTreeState& apvts, CartridgeProcessor& proc);
     ~ModulationBarComponent() override;
 
     void paint (juce::Graphics&) override;
@@ -28,7 +31,9 @@ public:
     static constexpr int detailHeight = 100;
 
 private:
-    enum ModIndex { MOD_LFO = 0, MOD_PORTA, MOD_ARP, MOD_DPCM, NUM_MOD };
+    enum ModIndex { MOD_LFO = 0, MOD_PORTA, MOD_ARP, MOD_DPCM, MOD_SEQ, NUM_MOD };
+
+    static constexpr int seqDetailHeight = 140;
 
     void toggleExpand (int modIndex);
     void styleKnob (juce::Slider& knob);
@@ -77,6 +82,21 @@ private:
     juce::Label dpcmSampleLabel;
     juce::TextButton dpcmLoadButton { "Load" };
     std::shared_ptr<juce::FileChooser> dpcmFileChooser;
+
+    // ─── Step Sequencer ─────────────────────────────────────────────────
+    juce::ToggleButton seqEnable;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> seqEnableAttach;
+
+    juce::Slider seqRate;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> seqRateAttach;
+    juce::Label seqRateLabel;
+
+    juce::ToggleButton seqSyncToggle;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> seqSyncAttach;
+    juce::ComboBox seqSyncDiv;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> seqSyncDivAttach;
+
+    std::unique_ptr<StepSequencerComponent> stepSeqGrid;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulationBarComponent)
 };

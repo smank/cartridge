@@ -727,10 +727,24 @@ void ChannelStripComponent::resized()
     }
 
     // Pan + Mix faders at bottom, labels drawn by paint() above them
-    mixFader.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
-    area.removeFromBottom (labelH);  // "MIX" label
-    panKnob.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
-    area.removeFromBottom (labelH);  // "PAN" label
+    // Guard: ensure bottom controls don't overlap top controls
+    int bottomNeeded = (sliderH + labelH) * 2;
+    if (area.getHeight() >= bottomNeeded)
+    {
+        mixFader.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
+        area.removeFromBottom (labelH);  // "MIX" label
+        panKnob.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
+        area.removeFromBottom (labelH);  // "PAN" label
+    }
+    else
+    {
+        // Tight space — stack pan and mix into whatever remains, no label gaps
+        auto bottom = getLocalBounds().reduced (3).removeFromBottom (bottomNeeded);
+        bottom.removeFromTop (2); // small pad
+        panKnob.setBounds (bottom.removeFromTop (sliderH).reduced (2, 0));
+        bottom.removeFromTop (labelH);
+        mixFader.setBounds (bottom.removeFromTop (sliderH).reduced (2, 0));
+    }
 }
 
 } // namespace cart

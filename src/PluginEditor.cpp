@@ -11,7 +11,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
       channelStrips (p.getApvts()),
       modernPanel (p.getApvts()),
       effectsBar (p.getApvts()),
-      modulationBar (p.getApvts()),
+      modulationBar (p.getApvts(), p),
       statusBar (p),
       keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
@@ -99,9 +99,19 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
         }
     };
 
-    // Wire up FX panel height changes
-    effectsBar.onHeightChanged = [this] { resized(); };
-    modulationBar.onHeightChanged = [this] { resized(); };
+    // Wire up FX/Mod panel height changes — mutually exclusive expansion
+    effectsBar.onHeightChanged = [this]
+    {
+        if (effectsBar.getDesiredHeight() > effectsBar.headerHeight)
+            modulationBar.collapseAll();
+        resized();
+    };
+    modulationBar.onHeightChanged = [this]
+    {
+        if (modulationBar.getDesiredHeight() > modulationBar.headerHeight)
+            effectsBar.collapseAll();
+        resized();
+    };
 
     // Style the keyboard
     keyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId,
@@ -267,8 +277,43 @@ void CartridgeEditor::resized()
     keyboard.setKeyWidth (juce::jmax (kw, 14.0f));
 
     statusBar.setBounds (area.removeFromBottom (statusBarHeight));
-    effectsBar.setBounds (area.removeFromBottom (effectsBar.getDesiredHeight()));
-    modulationBar.setBounds (area.removeFromBottom (modulationBar.getDesiredHeight()));
+
+    // Calculate panel heights, capping them to preserve minimum channel strip space
+    static constexpr int minStripHeight = 240;
+    int fxDesired  = effectsBar.getDesiredHeight();
+    int modDesired = modulationBar.getDesiredHeight();
+    int panelsTotal = fxDesired + modDesired;
+    int available = area.getHeight();
+
+    if (available - panelsTotal < minStripHeight)
+    {
+        // Not enough room — shrink the expanded panel's detail area
+        int budget = juce::jmax (0, available - minStripHeight);
+        int fxHeader  = effectsBar.headerHeight;
+        int modHeader = modulationBar.headerHeight;
+
+        if (fxDesired > fxHeader && modDesired <= modHeader)
+        {
+            // Only FX is expanded
+            fxDesired = juce::jmax (fxHeader, budget - modHeader);
+            modDesired = modHeader;
+        }
+        else if (modDesired > modHeader && fxDesired <= fxHeader)
+        {
+            // Only Mod is expanded
+            modDesired = juce::jmax (modHeader, budget - fxHeader);
+            fxDesired = fxHeader;
+        }
+        else
+        {
+            // Both collapsed or both somehow open — just use headers
+            fxDesired = fxHeader;
+            modDesired = modHeader;
+        }
+    }
+
+    effectsBar.setBounds (area.removeFromBottom (fxDesired));
+    modulationBar.setBounds (area.removeFromBottom (modDesired));
 
     if (modernModeActive)
     {

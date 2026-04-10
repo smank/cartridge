@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 if(APPLE)
-    project(Cartridge VERSION 1.8.0 LANGUAGES C CXX OBJC OBJCXX)
+    project(Cartridge VERSION 1.9.0 LANGUAGES C CXX OBJC OBJCXX)
 else()
-    project(Cartridge VERSION 1.8.0 LANGUAGES C CXX)
+    project(Cartridge VERSION 1.9.0 LANGUAGES C CXX)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -73,6 +73,7 @@ target_sources(Cartridge
         src/dsp/effects/EffectsChain.cpp
         src/ui/EffectsBarComponent.cpp
         src/ui/ModulationBarComponent.cpp
+        src/ui/StepSequencerComponent.cpp
         src/ui/ModernPanelComponent.cpp
         src/ui/StatusBarComponent.cpp
         src/ui/WaveformDisplay.cpp

@@ -14,6 +14,7 @@
 #include "ABCompare.h"
 #include "midi/TuningTable.h"
 #include "dsp/DpcmSampleManager.h"
+#include "dsp/StepSequencer.h"
 
 class CartridgeProcessor : public juce::AudioProcessor
 {
@@ -57,6 +58,14 @@ public:
 
     cart::DpcmSampleManager& getDpcmSampleManager() { return dpcmSampleManager; }
 
+    // Step Sequencer data — UI writes, audio thread reads
+    cart::StepSequenceData& getSequenceData (int channel) { return stepSequenceData[channel]; }
+    const cart::StepSequenceData& getSequenceData (int channel) const { return stepSequenceData[channel]; }
+    std::atomic<int> sequenceDataVersion { 0 };
+
+    // Step sequencer playback position for UI (audio thread writes, UI reads)
+    std::atomic<int> seqPlaybackStep[8] = {};
+
     // MIDI Learn
     void setMidiLearnSlot (int slot) { midiLearnSlot.store (slot); }
     int  getMidiLearnSlot() const    { return midiLearnSlot.load(); }
@@ -86,6 +95,12 @@ private:
     cart::Lfo              lfo;
     cart::TuningTable      tuningTable;
     cart::DpcmSampleManager dpcmSampleManager;
+    cart::StepSequencer     stepSequencers[8];
+    cart::StepSequenceData  stepSequenceData[8];
+    cart::StepSequenceData  stepSeqSnapshot[8];  // Audio-thread copy
+    int                    lastSeqDataVersion = -1;
+    float                  lastSeqPitchOffset[8] = {};
+    int                    lastModernSeqDuty = -1;
     bool                   usingModernEngine = false;
     int                    lastArpNote = -1;
     int                    fadeInSamplesRemaining = 0;
@@ -225,6 +240,12 @@ private:
     std::atomic<float>* arpSyncDivParam     = nullptr;
     std::atomic<float>* dlSyncEnabledParam  = nullptr;
     std::atomic<float>* dlSyncDivParam      = nullptr;
+
+    // Step Sequencer
+    std::atomic<float>* seqEnabledParam     = nullptr;
+    std::atomic<float>* seqRateParam        = nullptr;
+    std::atomic<float>* seqSyncEnabledParam = nullptr;
+    std::atomic<float>* seqSyncDivParam     = nullptr;
 
     // Per-channel pan
     std::atomic<float>* p1PanParam       = nullptr;

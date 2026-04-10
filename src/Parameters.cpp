@@ -487,6 +487,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     makePanParam(ParamIDs::Vrc6P2Pan,  "VRC6 Pulse 2 Pan");
     makePanParam(ParamIDs::Vrc6SawPan, "VRC6 Saw Pan");
 
+    // ─── Step Sequencer ────────────────────────────────────────────────
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID { ParamIDs::SeqEnabled, 1 }, "Step Seq Enabled", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID { ParamIDs::SeqRate, 1 }, "Step Seq Rate",
+        juce::NormalisableRange<float>(1.0f, 60.0f, 0.1f), 8.0f,
+        juce::AudioParameterFloatAttributes().withLabel("Hz")));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID { ParamIDs::SeqSyncEnabled, 1 }, "Step Seq Sync", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID { ParamIDs::SeqSyncDiv, 1 }, "Step Seq Sync Div",
+        syncDivisions, 4));  // default 1/16
+
     return { params.begin(), params.end() };
 }
 

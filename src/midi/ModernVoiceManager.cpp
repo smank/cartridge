@@ -109,10 +109,14 @@ void ModernVoiceManager::handleNoteOn (int note, float velocity, int midiChannel
     {
         enginePtr->setVoiceMidiChannel (voiceIdx, midiChannel);
     }
+
+    if (onNoteGate) onNoteGate (true);
 }
 
 void ModernVoiceManager::handleNoteOff (int note, int midiChannel)
 {
+    if (onNoteGate) onNoteGate (false);
+
     if (mpeEnabled && midiChannel > 1)
     {
         // In MPE mode, release only the specific voice on this channel+note
@@ -178,6 +182,7 @@ void ModernVoiceManager::applyPitchMultiplier (float mult)
 
 void ModernVoiceManager::handleAllNotesOff()
 {
+    if (onNoteGate) onNoteGate (false);
     if (enginePtr != nullptr)
         enginePtr->allNotesOff();
 }

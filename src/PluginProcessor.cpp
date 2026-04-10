@@ -146,6 +146,12 @@ CartridgeProcessor::CartridgeProcessor()
     dlSyncEnabledParam  = apvts.getRawParameterValue(cart::ParamIDs::DlSyncEnabled);
     dlSyncDivParam      = apvts.getRawParameterValue(cart::ParamIDs::DlSyncDiv);
 
+    // Step Sequencer params
+    seqEnabledParam     = apvts.getRawParameterValue(cart::ParamIDs::SeqEnabled);
+    seqRateParam        = apvts.getRawParameterValue(cart::ParamIDs::SeqRate);
+    seqSyncEnabledParam = apvts.getRawParameterValue(cart::ParamIDs::SeqSyncEnabled);
+    seqSyncDivParam     = apvts.getRawParameterValue(cart::ParamIDs::SeqSyncDiv);
+
     // Per-channel pan params
     p1PanParam       = apvts.getRawParameterValue(cart::ParamIDs::P1Pan);
     p2PanParam       = apvts.getRawParameterValue(cart::ParamIDs::P2Pan);
@@ -253,6 +259,31 @@ CartridgeProcessor::CartridgeProcessor()
 
     voiceManager.onControlChange = ccHandler;
     modernVoiceManager.onControlChange = ccHandler;
+
+    // Step sequencer note gate callback
+    voiceManager.onNoteGate = [this] (int ch, bool on)
+    {
+        if (ch >= 0 && ch < 8)
+        {
+            if (on)
+                stepSequencers[ch].trigger();
+            else
+                stepSequencers[ch].release();
+        }
+    };
+
+    // Modern engine note gate — uses channel 0 sequencer for global modulation
+    modernVoiceManager.onNoteGate = [this] (bool on)
+    {
+        if (on)
+            stepSequencers[0].trigger();
+        else
+            stepSequencers[0].release();
+    };
+
+    // Initialize sequencer data pointers
+    for (int i = 0; i < 8; ++i)
+        stepSequencers[i].setData (&stepSeqSnapshot[i]);
 }
 
 CartridgeProcessor::~CartridgeProcessor() = default;
@@ -297,6 +328,8 @@ void CartridgeProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     arpeggiator.setSampleRate (sampleRate);
     voiceManager.setSampleRateForPorta (sampleRate);
     lfo.setSampleRate (sampleRate);
+    for (int i = 0; i < 8; ++i)
+        stepSequencers[i].setSampleRate (sampleRate);
     // DC blocker state intentionally preserved — resetting to 0 causes a settling
     // transient.  Member initializers handle the very first startup.
     waveformBuffer.reset();
@@ -532,6 +565,36 @@ void CartridgeProcessor::updateDspFromParameters()
     lfo.setVibratoDepth (*lfoVibratoDepthParam);
     lfo.setTremoloDepth (*lfoTremoloDepthParam);
 
+    // Step Sequencer
+    {
+        bool seqEn = *seqEnabledParam > 0.5f;
+        float seqRateHz;
+        if (*seqSyncEnabledParam > 0.5f)
+        {
+            float beatsPerDiv = divisionToBeats (static_cast<int> (*seqSyncDivParam));
+            seqRateHz = cachedBpm / (60.0f * beatsPerDiv);
+        }
+        else
+        {
+            seqRateHz = *seqRateParam;
+        }
+
+        // Copy sequence data from UI if version changed
+        int ver = sequenceDataVersion.load (std::memory_order_acquire);
+        if (ver != lastSeqDataVersion)
+        {
+            for (int i = 0; i < 8; ++i)
+                stepSeqSnapshot[i] = stepSequenceData[i];
+            lastSeqDataVersion = ver;
+        }
+
+        for (int i = 0; i < 8; ++i)
+        {
+            stepSequencers[i].setEnabled (seqEn);
+            stepSequencers[i].setRateHz (seqRateHz);
+        }
+    }
+
     // Tuning system
     if (changed(cachedParams.tuningSystem, *tuningSystemParam))
     {
@@ -579,6 +642,12 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         arpeggiator.reset();
         lastArpNote = -1;
         lfo.reset();
+        for (int i = 0; i < 8; ++i)
+        {
+            stepSequencers[i].reset();
+            lastSeqPitchOffset[i] = 0.0f;
+            voiceManager.setSeqPitchOffset (i, 0.0f);
+        }
         sustainPedal.store (false);
         cachedParams = CachedParams{};
         fadeInSamplesRemaining = 1024;   // ~23 ms — covers DC blocker settling
@@ -728,7 +797,45 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             if (pitchMult != 1.0f)
                 modernVoiceManager.applyPitchMultiplier (pitchMult);
 
-            float out = modernEngine.process() * lfo.getVolumeMultiplier();
+            // Step sequencer modulation (channel 0 drives Modern engine globally)
+            float seqVolMult = 1.0f;
+            if (*seqEnabledParam > 0.5f)
+            {
+                auto mod = stepSequencers[0].process();
+
+                // Volume: scale 0-15 to 0.0-1.0 multiplier
+                if (mod.volumeOverride >= 0)
+                    seqVolMult = static_cast<float> (mod.volumeOverride) / 15.0f;
+
+                // Pitch: apply as additional pitch bend multiplier
+                if (mod.pitchOffset != 0)
+                {
+                    float seqPitchMult = std::pow (2.0f, static_cast<float> (mod.pitchOffset) / 12.0f);
+                    modernEngine.applyPitchMultiplier (seqPitchMult);
+                }
+
+                // Duty: switch waveform only when value changes
+                if (mod.dutyOverride >= 0 && mod.dutyOverride <= 3 && mod.dutyOverride != lastModernSeqDuty)
+                {
+                    lastModernSeqDuty = mod.dutyOverride;
+                    static constexpr cart::NesWaveform dutyWaveforms[] = {
+                        cart::NesWaveform::Pulse25, cart::NesWaveform::Pulse50,
+                        cart::NesWaveform::Pulse75, cart::NesWaveform::Pulse125
+                    };
+                    modernEngine.setWaveform (dutyWaveforms[mod.dutyOverride]);
+                }
+                else if (mod.dutyOverride < 0 && lastModernSeqDuty >= 0)
+                {
+                    // Duty lane inactive — restore APVTS waveform
+                    lastModernSeqDuty = -1;
+                    modernEngine.setWaveform (static_cast<cart::NesWaveform> (static_cast<int> (*modWaveformParam)));
+                }
+
+                seqPlaybackStep[0].store (stepSequencers[0].getActiveStepIndex(),
+                                           std::memory_order_relaxed);
+            }
+
+            float out = modernEngine.process() * lfo.getVolumeMultiplier() * seqVolMult;
 
             // DC blocking filter
             float dcOut = out - dcBlockX + 0.995f * dcBlockY;
@@ -745,6 +852,75 @@ void CartridgeProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
             if (pitchMult != 1.0f)
                 voiceManager.applyPitchMultiplier (pitchMult);
+
+            // Step sequencer modulation (before APU render)
+            if (*seqEnabledParam > 0.5f)
+            {
+                for (int ch = 0; ch < 8; ++ch)
+                {
+                    auto mod = stepSequencers[ch].process();
+
+                    // Volume override
+                    if (mod.volumeOverride >= 0)
+                    {
+                        auto vol = static_cast<uint8_t> (mod.volumeOverride);
+                        switch (ch)
+                        {
+                            case 0: apu.pulse1().envelope().setVolume (vol); break;
+                            case 1: apu.pulse2().envelope().setVolume (vol); break;
+                            // case 2: triangle has no volume control
+                            case 3: apu.noise().envelope().setVolume (vol); break;
+                            case 5: apu.vrc6Pulse1().setVolume (vol); break;
+                            case 6: apu.vrc6Pulse2().setVolume (vol); break;
+                            default: break;
+                        }
+                    }
+
+                    // Pitch offset — only recompute frequency when it changes
+                    {
+                        float newOffset = static_cast<float> (mod.pitchOffset);
+                        if (newOffset != lastSeqPitchOffset[ch])
+                        {
+                            lastSeqPitchOffset[ch] = newOffset;
+                            voiceManager.setSeqPitchOffset (ch, newOffset);
+                            if (voiceManager.isChannelActive (ch))
+                                voiceManager.recomputeFrequency (ch);
+                        }
+                    }
+
+                    // Duty cycle override
+                    if (mod.dutyOverride >= 0)
+                    {
+                        switch (ch)
+                        {
+                            case 0: apu.pulse1().setDuty (mod.dutyOverride); break;
+                            case 1: apu.pulse2().setDuty (mod.dutyOverride); break;
+                            case 5: apu.vrc6Pulse1().setDuty (mod.dutyOverride); break;
+                            case 6: apu.vrc6Pulse2().setDuty (mod.dutyOverride); break;
+                            default: break;
+                        }
+                    }
+
+                    // Update playback position for UI
+                    if (stepSequencers[ch].isActive())
+                        seqPlaybackStep[ch].store (stepSequencers[ch].getActiveStepIndex(),
+                                                    std::memory_order_relaxed);
+                }
+            }
+            else
+            {
+                // Seq disabled — clear any stale pitch offsets
+                for (int ch = 0; ch < 8; ++ch)
+                {
+                    if (lastSeqPitchOffset[ch] != 0.0f)
+                    {
+                        lastSeqPitchOffset[ch] = 0.0f;
+                        voiceManager.setSeqPitchOffset (ch, 0.0f);
+                        if (voiceManager.isChannelActive (ch))
+                            voiceManager.recomputeFrequency (ch);
+                    }
+                }
+            }
 
             float chOut[8];
             apu.processIndividual (chOut);
@@ -854,6 +1030,36 @@ void CartridgeProcessor::getStateInformation (juce::MemoryBlock& destData)
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     dpcmSampleManager.saveToXml (*xml);
+
+    // Save step sequence data
+    for (int ch = 0; ch < 8; ++ch)
+    {
+        auto& sd = stepSequenceData[ch];
+        bool hasData = sd.numVolumeSteps > 0 || sd.numPitchSteps > 0 || sd.numDutySteps > 0;
+        if (!hasData) continue;
+
+        auto* seqEl = xml->createNewChildElement ("StepSeq");
+        seqEl->setAttribute ("ch", ch);
+        seqEl->setAttribute ("numVol", sd.numVolumeSteps);
+        seqEl->setAttribute ("numPitch", sd.numPitchSteps);
+        seqEl->setAttribute ("numDuty", sd.numDutySteps);
+        seqEl->setAttribute ("volLoop", sd.volumeLoop);
+        seqEl->setAttribute ("pitchLoop", sd.pitchLoop);
+        seqEl->setAttribute ("dutyLoop", sd.dutyLoop);
+
+        juce::String volStr, pitchStr, dutyStr;
+        for (int i = 0; i < sd.numVolumeSteps; ++i)
+            volStr += (i > 0 ? "," : "") + juce::String (sd.volumeSteps[i]);
+        for (int i = 0; i < sd.numPitchSteps; ++i)
+            pitchStr += (i > 0 ? "," : "") + juce::String (sd.pitchSteps[i]);
+        for (int i = 0; i < sd.numDutySteps; ++i)
+            dutyStr += (i > 0 ? "," : "") + juce::String (sd.dutySteps[i]);
+
+        if (volStr.isNotEmpty())   seqEl->setAttribute ("vol", volStr);
+        if (pitchStr.isNotEmpty()) seqEl->setAttribute ("pitch", pitchStr);
+        if (dutyStr.isNotEmpty())  seqEl->setAttribute ("duty", dutyStr);
+    }
+
     copyXmlToBinary (*xml, destData);
 }
 
@@ -863,6 +1069,38 @@ void CartridgeProcessor::setStateInformation (const void* data, int sizeInBytes)
     if (xmlState != nullptr && xmlState->hasTagName (apvts.state.getType()))
     {
         dpcmSampleManager.loadFromXml (*xmlState);
+
+        // Load step sequence data
+        for (int ch = 0; ch < 8; ++ch)
+            stepSequenceData[ch] = cart::StepSequenceData{};
+
+        for (auto* seqEl : xmlState->getChildWithTagNameIterator ("StepSeq"))
+        {
+            int ch = seqEl->getIntAttribute ("ch", -1);
+            if (ch < 0 || ch >= 8) continue;
+
+            auto& sd = stepSequenceData[ch];
+            sd.numVolumeSteps = seqEl->getIntAttribute ("numVol", 0);
+            sd.numPitchSteps  = seqEl->getIntAttribute ("numPitch", 0);
+            sd.numDutySteps   = seqEl->getIntAttribute ("numDuty", 0);
+            sd.volumeLoop     = seqEl->getBoolAttribute ("volLoop", false);
+            sd.pitchLoop      = seqEl->getBoolAttribute ("pitchLoop", false);
+            sd.dutyLoop       = seqEl->getBoolAttribute ("dutyLoop", false);
+
+            auto parseInts = [] (const juce::String& str, int* dest, int maxCount)
+            {
+                juce::StringArray tokens;
+                tokens.addTokens (str, ",", "");
+                for (int i = 0; i < juce::jmin (tokens.size(), maxCount); ++i)
+                    dest[i] = tokens[i].getIntValue();
+            };
+
+            parseInts (seqEl->getStringAttribute ("vol"),   sd.volumeSteps, cart::StepSequenceData::kMaxSteps);
+            parseInts (seqEl->getStringAttribute ("pitch"), sd.pitchSteps,  cart::StepSequenceData::kMaxSteps);
+            parseInts (seqEl->getStringAttribute ("duty"),  sd.dutySteps,   cart::StepSequenceData::kMaxSteps);
+        }
+        sequenceDataVersion.fetch_add (1, std::memory_order_release);
+
         apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
         abCompare.initialize (apvts);        // Re-sync A/B snapshots with restored state
         pendingDspReset.store (true);        // Actual reset deferred to audio thread

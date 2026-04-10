@@ -51,11 +51,17 @@ public:
     /// Set the tuning table for microtuning support
     void setTuningTable (TuningTable* table) { tuningTablePtr = table; }
 
+    /// Set step sequencer pitch offset for a channel (semitones)
+    void setSeqPitchOffset (int ch, float semitones) { if (ch >= 0 && ch < 8) seqPitchOffset[ch] = semitones; }
+
     /// Process a single MIDI message
     void processMidiMessage (const juce::MidiMessage& msg);
 
     /// Apply a pitch multiplier to all active voices (for LFO vibrato)
     void applyPitchMultiplier (float multiplier);
+
+    /// Recompute frequency for a single channel (used by step sequencer pitch)
+    void recomputeFrequency (int nesChannel);
 
     // Portamento control
     void setPortamentoEnabled (bool en);
@@ -71,6 +77,9 @@ public:
 
     /// Callback for MIDI CC messages (ccNumber, value01)
     std::function<void(int, float)> onControlChange;
+
+    /// Callback for note gate events (channel, noteOn)
+    std::function<void(int, bool)> onNoteGate;
 
 private:
     // Portamento for each melodic channel
@@ -91,6 +100,7 @@ private:
     float     masterTuneCents     = 0.0f;
 
     float     transpose[8]        = {};   // Semitones per NES channel
+    float     seqPitchOffset[8]   = {};   // Step sequencer pitch offset (semitones)
     int       dpcmSampleParam     = 0;    // Fallback DPCM sample index
     TuningTable* tuningTablePtr   = nullptr;
 
