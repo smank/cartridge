@@ -68,7 +68,7 @@ All ~190 parameters defined in `src/Parameters.h` (IDs) and `src/Parameters.cpp`
 
 ### UI Layout
 
-`CartridgeEditor` stacks components vertically: TopBar → Waveform → ChannelStrips/ModernPanel → ModulationBar → EffectsBar → StatusBar → Keyboard. The FX and Mod bars are accordion-style (mutually exclusive expansion). A minimum channel strip height (240px) is enforced so bottom panels never crush the channel controls.
+`CartridgeEditor` stacks components vertically: TopBar → Waveform → ChannelStrips/ModernPanel → ModulationBar → EffectsBar → StatusBar → Keyboard. The FX and Mod bars are accordion-style (mutually exclusive expansion). A minimum channel strip height (240px) is enforced so bottom panels never crush the channel controls. The layout fills the full window bounds — scaling options are 100%, 125%, 150%, 200%. First launch auto-detects the best scale for the display. In macOS fullscreen the content stretches to fill the screen.
 
 ### Thread Safety
 
@@ -82,7 +82,11 @@ Sequence step data (16 steps x 3 lanes x 8 channels) is stored outside APVTS as 
 
 ### Preset System
 
-36 factory presets + user presets. `PresetManager` handles save/load/import/export. `ABCompare` stores two APVTS snapshots for quick A/B toggling. Presets trigger `pendingDspReset` to cleanly reinitialize DSP state.
+36 factory presets + user presets. `PresetManager` handles save/load/import/export. Preset XML files can contain `<StepSeq>` elements for embedded step sequence data (used by VGM imports). `setCurrentProgram()` loads step seq data from presets and bumps `sequenceDataVersion`. `ABCompare` stores two APVTS snapshots for quick A/B toggling. Presets trigger `pendingDspReset` to cleanly reinitialize DSP state.
+
+### VGM Import
+
+`src/import/` contains a VGM/VGZ parser and instrument extractor. The parser handles gzip decompression, VGM header/command parsing, and GD3 tag extraction. The extractor tracks per-channel APU register state, detects note boundaries (writes to register 3), samples at 60Hz frame intervals, and produces `StepSequenceData` with volume/pitch/duty envelopes. Instruments are saved as user presets with embedded `<StepSeq>` XML via `VgmImporter::importFile()`. The Import button in TopBarComponent routes `.vgm`/`.vgz` files to this path.
 
 ## Key Files
 
@@ -92,6 +96,9 @@ Sequence step data (16 steps x 3 lanes x 8 channels) is stored outside APVTS as 
 - `src/dsp/Apu.h` — Master APU controller owning all 8 channels
 - `src/dsp/StepSequencer.h` — Phase-accumulator step sequencer (header-only)
 - `src/ui/ModulationBarComponent.cpp` — Accordion UI for LFO/Porta/Arp/DPCM/StepSeq
+- `src/import/VgmImporter.cpp` — Top-level VGM import: parse, extract, save presets
+- `src/import/VgmParser.cpp` — VGM/VGZ file format parser (header, commands, GD3)
+- `src/import/VgmInstrumentExtractor.cpp` — NES APU register analysis → StepSequenceData
 
 ## Known Gotchas
 
