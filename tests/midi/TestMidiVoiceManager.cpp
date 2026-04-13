@@ -214,10 +214,13 @@ TEST_CASE("MidiVoiceManager", "[midi]")
     {
         int receivedCC = -1;
         float receivedVal = -1.0f;
-        vm.onControlChange = [&](int cc, float val) {
-            receivedCC = cc;
-            receivedVal = val;
+        vm.onControlChange = [](void* ctx, int cc, float val) {
+            auto* self = static_cast<std::pair<int*,float*>*>(ctx);
+            *self->first = cc;
+            *self->second = val;
         };
+        auto pair = std::make_pair(&receivedCC, &receivedVal);
+        vm.ccContext = &pair;
 
         auto ccMsg = juce::MidiMessage::controllerEvent(1, 74, 64);
         vm.processMidiMessage(ccMsg);

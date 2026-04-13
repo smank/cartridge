@@ -4,7 +4,6 @@
 #include "../dsp/Apu.h"
 #include "../dsp/Portamento.h"
 #include "TuningTable.h"
-#include <functional>
 
 namespace cart {
 
@@ -75,11 +74,13 @@ public:
     /// Check if a channel is currently playing a note
     bool isChannelActive (int ch) const { return ch >= 0 && ch < 8 && activeNotes[ch] >= 0; }
 
-    /// Callback for MIDI CC messages (ccNumber, value01)
-    std::function<void(int, float)> onControlChange;
+    /// Callback for MIDI CC messages (context, ccNumber, value01)
+    void (*onControlChange)(void* ctx, int cc, float val) = nullptr;
+    void* ccContext = nullptr;
 
-    /// Callback for note gate events (channel, noteOn)
-    std::function<void(int, bool)> onNoteGate;
+    /// Callback for note gate events (context, channel, noteOn)
+    void (*onNoteGate)(void* ctx, int ch, bool on) = nullptr;
+    void* gateContext = nullptr;
 
 private:
     // Portamento for each melodic channel

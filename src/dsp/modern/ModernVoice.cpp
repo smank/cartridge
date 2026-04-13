@@ -138,9 +138,9 @@ float ModernVoice::process()
         mixed += sumB * unisonNorm * oscBLevel;
     }
 
-    // Apply envelope and velocity
+    // Apply envelope and velocity, with tiny DC offset to prevent denormals
     float env = envelope.process();
-    return mixed * env * velocityGain;
+    return mixed * env * velocityGain + 1e-25f;
 }
 
 void ModernVoice::reset()

@@ -77,7 +77,7 @@ void ModernVoiceManager::processMidiMessage (const juce::MidiMessage& msg)
         else
         {
             if (onControlChange)
-                onControlChange (cc, value01);
+                onControlChange (ccContext, cc, value01);
         }
     }
     else if (msg.isChannelPressure())
@@ -110,12 +110,12 @@ void ModernVoiceManager::handleNoteOn (int note, float velocity, int midiChannel
         enginePtr->setVoiceMidiChannel (voiceIdx, midiChannel);
     }
 
-    if (onNoteGate) onNoteGate (true);
+    if (onNoteGate) onNoteGate (gateContext,true);
 }
 
 void ModernVoiceManager::handleNoteOff (int note, int midiChannel)
 {
-    if (onNoteGate) onNoteGate (false);
+    if (onNoteGate) onNoteGate (gateContext,false);
 
     if (mpeEnabled && midiChannel > 1)
     {
@@ -182,7 +182,7 @@ void ModernVoiceManager::applyPitchMultiplier (float mult)
 
 void ModernVoiceManager::handleAllNotesOff()
 {
-    if (onNoteGate) onNoteGate (false);
+    if (onNoteGate) onNoteGate (gateContext,false);
     if (enginePtr != nullptr)
         enginePtr->allNotesOff();
 }

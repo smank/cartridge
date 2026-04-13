@@ -162,6 +162,9 @@ if(CARTRIDGE_BUILD_TESTS)
         src/midi/Arpeggiator.cpp
         src/Parameters.cpp
         src/PresetManager.cpp
+        src/import/VgmParser.cpp
+        src/import/VgmInstrumentExtractor.cpp
+        src/import/VgmImporter.cpp
     )
     target_include_directories(CartridgeCore PUBLIC src)
     target_link_libraries(CartridgeCore PUBLIC
@@ -201,6 +204,9 @@ if(CARTRIDGE_BUILD_TESTS)
         tests/TestPresetManager.cpp
         tests/TestABCompare.cpp
         tests/regression/TestRegressionBugs.cpp
+        tests/dsp/TestStepSequencer.cpp
+        tests/import/TestVgmParser.cpp
+        tests/import/TestVgmInstrumentExtractor.cpp
     )
     target_include_directories(CartridgeTests PRIVATE tests)
     target_link_libraries(CartridgeTests PRIVATE CartridgeCore Catch2::Catch2WithMain)

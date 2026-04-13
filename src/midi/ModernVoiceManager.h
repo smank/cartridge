@@ -3,7 +3,6 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include "../dsp/modern/ModernEngine.h"
 #include "TuningTable.h"
-#include <functional>
 
 namespace cart {
 
@@ -27,11 +26,13 @@ public:
     /// Returns true if MPE mode is active (MCM received with zone size > 0)
     bool isMpeEnabled() const { return mpeEnabled; }
 
-    /// Callback for MIDI CC messages (ccNumber, value01)
-    std::function<void(int, float)> onControlChange;
+    /// Callback for MIDI CC messages (context, ccNumber, value01)
+    void (*onControlChange)(void* ctx, int cc, float val) = nullptr;
+    void* ccContext = nullptr;
 
-    /// Callback for note gate events (noteOn = true/false)
-    std::function<void(bool)> onNoteGate;
+    /// Callback for note gate events (context, noteOn = true/false)
+    void (*onNoteGate)(void* ctx, bool on) = nullptr;
+    void* gateContext = nullptr;
 
 private:
     void handleNoteOn (int note, float velocity, int midiChannel = 1);

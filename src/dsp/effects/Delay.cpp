@@ -54,12 +54,13 @@ void Delay::process (juce::AudioBuffer<float>& buffer)
         float wetR = delayR.popSample (0);
 
         // Ping-pong: feed L's wet into R's delay and vice versa
-        float fbL = fbFilterL.processSample (wetL);
-        float fbR = fbFilterR.processSample (wetR);
+        // tanh saturation prevents runaway feedback
+        float fbL = std::tanh (fbFilterL.processSample (wetL) * feedback);
+        float fbR = std::tanh (fbFilterR.processSample (wetR) * feedback);
 
         // Push input + cross-feedback into delay lines
-        delayL.pushSample (0, dataL[i] + fbR * feedback);
-        delayR.pushSample (0, (dataR ? dataR[i] : dataL[i]) + fbL * feedback);
+        delayL.pushSample (0, dataL[i] + fbR);
+        delayR.pushSample (0, (dataR ? dataR[i] : dataL[i]) + fbL);
 
         // Mix dry/wet
         dataL[i] = dataL[i] + wetL * mix;

@@ -78,7 +78,11 @@ public:
     // Waveform ring buffer for oscilloscope display
     cart::WaveformBuffer waveformBuffer;
 
+    /// Static CC callback for voice managers (avoids std::function on audio thread)
+    static void handleCCCallback (void* ctx, int cc, float value01);
+
 private:
+    void handleCC (int cc, float value01);
     void updateDspFromParameters();
 
     juce::AudioProcessorValueTreeState apvts;

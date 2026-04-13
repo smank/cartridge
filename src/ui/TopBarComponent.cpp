@@ -48,19 +48,21 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         dlg->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
 
         dlg->enterModalState (true, juce::ModalCallbackFunction::create (
-            [this, dlg] (int result)
+            [this] (int result)
             {
                 if (result == 1)
                 {
-                    auto presetName = dlg->getTextEditorContents ("name");
-                    if (presetName.isNotEmpty())
+                    if (auto* aw = dynamic_cast<juce::AlertWindow*> (juce::Component::getCurrentlyModalComponent()))
                     {
-                        processorRef.getPresetManager().saveUserPreset (presetName, processorRef.getApvts());
-                        populatePresets();
+                        auto presetName = aw->getTextEditorContents ("name");
+                        if (presetName.isNotEmpty())
+                        {
+                            processorRef.getPresetManager().saveUserPreset (presetName, processorRef.getApvts());
+                            populatePresets();
+                        }
                     }
                 }
-                delete dlg;
-            }), false);
+            }), true);
     };
     saveButton.setTooltip ("Save current settings as user preset");
     addAndMakeVisible (saveButton);
@@ -177,7 +179,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         dlg->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
 
         dlg->enterModalState (true, juce::ModalCallbackFunction::create (
-            [this, dlg, idx] (int result)
+            [this, idx] (int result)
             {
                 if (result == 1)
                 {
@@ -185,8 +187,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
                     populatePresets();
                     selectPreset (0);
                 }
-                delete dlg;
-            }), false);
+            }), true);
     };
     addAndMakeVisible (deleteButton);
 
@@ -394,12 +395,11 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         popup->addButton ("Learn 4", 4);
         popup->addButton ("OK", 0);
         popup->enterModalState (true, juce::ModalCallbackFunction::create (
-            [this, popup] (int result)
+            [this] (int result)
             {
                 if (result >= 1 && result <= 4)
                     processorRef.setMidiLearnSlot (result - 1);
-                delete popup;
-            }), false);
+            }), true);
     };
     addAndMakeVisible (midiInfoButton);
 

@@ -41,8 +41,8 @@ private:
     double sampleRate = 44100.0;
     float gateLength = 0.8f;
 
-    std::vector<int> heldNotes;
-    std::vector<int> sequence;
+    std::vector<int> heldNotes { [] { std::vector<int> v; v.reserve (128); return v; }() };
+    std::vector<int> sequence  { [] { std::vector<int> v; v.reserve (512); return v; }() };
     int sequenceIndex = 0;
     bool goingUp = true;
 

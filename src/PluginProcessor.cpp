@@ -167,119 +167,35 @@ CartridgeProcessor::CartridgeProcessor()
     abCompare.initialize (apvts);
 
     // MIDI CC → parameter mappings (shared by both Classic and Modern engines)
-    auto ccHandler = [this] (int cc, float value01)
+    voiceManager.onControlChange = &CartridgeProcessor::handleCCCallback;
+    voiceManager.ccContext = this;
+    modernVoiceManager.onControlChange = &CartridgeProcessor::handleCCCallback;
+    modernVoiceManager.ccContext = this;
+
+    // Step sequencer note gate callbacks
+    voiceManager.onNoteGate = [] (void* ctx, int ch, bool on)
     {
-        auto setNorm = [&] (const char* paramID, float v)
-        {
-            if (auto* p = apvts.getParameter (paramID))
-                p->setValueNotifyingHost (v);
-        };
-
-        auto setNormRange = [&] (const char* paramID, float v)
-        {
-            if (auto* p = apvts.getParameter (paramID))
-                p->setValueNotifyingHost (p->convertTo0to1 (v));
-        };
-
-        // MIDI Learn: if learning, assign incoming CC to the learn slot
-        int learnSlot = midiLearnSlot.exchange(-1);
-        if (learnSlot >= 0 && learnSlot < 4)
-        {
-            const char* ccNumIDs[] = {
-                cart::ParamIDs::UserCC1Num, cart::ParamIDs::UserCC2Num,
-                cart::ParamIDs::UserCC3Num, cart::ParamIDs::UserCC4Num
-            };
-            if (auto* p = apvts.getParameter(ccNumIDs[learnSlot]))
-                p->setValueNotifyingHost(p->convertTo0to1(static_cast<float>(cc)));
-            return;  // consume this CC event
-        }
-
-        // Check user CC mappings first
-        auto checkUserCC = [&](std::atomic<float>* numParam, std::atomic<float>* targetParam)
-        {
-            int ccNum = static_cast<int>(*numParam);
-            int target = static_cast<int>(*targetParam);
-            if (ccNum == cc && target > 0)
-            {
-                // Map target index to parameter ID and apply
-                static const char* targetParams[] = {
-                    nullptr,                          // 0 = None
-                    cart::ParamIDs::MasterVolume,     // 1
-                    cart::ParamIDs::P1Volume,         // 2
-                    cart::ParamIDs::P2Volume,         // 3
-                    cart::ParamIDs::NoiseVolume,      // 4
-                    cart::ParamIDs::Vrc6P1Volume,     // 5
-                    cart::ParamIDs::Vrc6P2Volume,     // 6
-                    cart::ParamIDs::FltCutoff,        // 7
-                    cart::ParamIDs::FltResonance,     // 8
-                    cart::ParamIDs::ChMix,            // 9
-                    cart::ParamIDs::DlMix,            // 10
-                    cart::ParamIDs::RvMix,            // 11
-                    cart::ParamIDs::LfoRate,          // 12
-                    cart::ParamIDs::LfoVibratoDepth,  // 13
-                    cart::ParamIDs::LfoTremoloDepth   // 14
-                };
-                if (target < 15 && targetParams[target] != nullptr)
-                {
-                    // For volume params (int 0-15), scale appropriately
-                    if (target >= 2 && target <= 6)
-                        setNormRange(targetParams[target], value01 * 15.0f);
-                    // For filter cutoff (20-20000 Hz, log scale)
-                    else if (target == 7)
-                        setNormRange(targetParams[target], 20.0f * std::pow(1000.0f, value01));
-                    // For filter resonance (0.1-5.0)
-                    else if (target == 8)
-                        setNormRange(targetParams[target], 0.1f + value01 * 4.9f);
-                    else
-                        setNorm(targetParams[target], value01);
-                }
-                return true;
-            }
-            return false;
-        };
-
-        if (checkUserCC(userCC1NumParam, userCC1TargetParam)) return;
-        if (checkUserCC(userCC2NumParam, userCC2TargetParam)) return;
-        if (checkUserCC(userCC3NumParam, userCC3TargetParam)) return;
-        if (checkUserCC(userCC4NumParam, userCC4TargetParam)) return;
-
-        switch (cc)
-        {
-            case 1:  setNorm (cart::ParamIDs::LfoVibratoDepth, value01); break;
-            case 11: setNorm (cart::ParamIDs::MasterVolume, value01); break;
-            case 74: setNormRange (cart::ParamIDs::FltCutoff,
-                         20.0f * std::pow (1000.0f, value01)); break;
-            case 71: setNormRange (cart::ParamIDs::FltResonance,
-                         0.1f + value01 * 4.9f); break;
-            case 91: setNorm (cart::ParamIDs::RvMix, value01); break;
-            case 93: setNorm (cart::ParamIDs::ChMix, value01); break;
-            default: break;
-        }
-    };
-
-    voiceManager.onControlChange = ccHandler;
-    modernVoiceManager.onControlChange = ccHandler;
-
-    // Step sequencer note gate callback
-    voiceManager.onNoteGate = [this] (int ch, bool on)
-    {
+        auto* self = static_cast<CartridgeProcessor*> (ctx);
         if (ch >= 0 && ch < 8)
         {
             if (on)
-                stepSequencers[ch].trigger();
+                self->stepSequencers[ch].trigger();
             else
-                stepSequencers[ch].release();
+                self->stepSequencers[ch].release();
         }
     };
+    voiceManager.gateContext = this;
 
     // Modern engine note gate — uses channel 0 sequencer for global modulation
-    modernVoiceManager.onNoteGate = [this] (bool on)
+    modernVoiceManager.onNoteGate = [] (void* ctx, bool on)
     {
+        auto* self = static_cast<CartridgeProcessor*> (ctx);
         if (on)
-            stepSequencers[0].trigger();
+            self->stepSequencers[0].trigger();
         else
-            stepSequencers[0].release();
+            self->stepSequencers[0].release();
     };
+    modernVoiceManager.gateContext = this;
 
     // Initialize sequencer data pointers
     for (int i = 0; i < 8; ++i)
@@ -1113,6 +1029,98 @@ void CartridgeProcessor::setStateInformation (const void* data, int sizeInBytes)
         apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
         abCompare.initialize (apvts);        // Re-sync A/B snapshots with restored state
         pendingDspReset.store (true);        // Actual reset deferred to audio thread
+    }
+}
+
+// ─── MIDI CC Callback (static → instance forwarding) ────────────────────────
+void CartridgeProcessor::handleCCCallback (void* ctx, int cc, float value01)
+{
+    static_cast<CartridgeProcessor*> (ctx)->handleCC (cc, value01);
+}
+
+void CartridgeProcessor::handleCC (int cc, float value01)
+{
+    auto setNorm = [&] (const char* paramID, float v)
+    {
+        if (auto* p = apvts.getParameter (paramID))
+            p->setValueNotifyingHost (v);
+    };
+
+    auto setNormRange = [&] (const char* paramID, float v)
+    {
+        if (auto* p = apvts.getParameter (paramID))
+            p->setValueNotifyingHost (p->convertTo0to1 (v));
+    };
+
+    // MIDI Learn: if learning, assign incoming CC to the learn slot
+    int learnSlot = midiLearnSlot.exchange (-1);
+    if (learnSlot >= 0 && learnSlot < 4)
+    {
+        const char* ccNumIDs[] = {
+            cart::ParamIDs::UserCC1Num, cart::ParamIDs::UserCC2Num,
+            cart::ParamIDs::UserCC3Num, cart::ParamIDs::UserCC4Num
+        };
+        if (auto* p = apvts.getParameter (ccNumIDs[learnSlot]))
+            p->setValueNotifyingHost (p->convertTo0to1 (static_cast<float> (cc)));
+        return;
+    }
+
+    // Check user CC mappings first
+    auto checkUserCC = [&] (std::atomic<float>* numParam, std::atomic<float>* targetParam)
+    {
+        int ccNum = static_cast<int> (*numParam);
+        int target = static_cast<int> (*targetParam);
+        if (ccNum == cc && target > 0)
+        {
+            static const char* targetParams[] = {
+                nullptr,                          // 0 = None
+                cart::ParamIDs::MasterVolume,     // 1
+                cart::ParamIDs::P1Volume,         // 2
+                cart::ParamIDs::P2Volume,         // 3
+                cart::ParamIDs::NoiseVolume,      // 4
+                cart::ParamIDs::Vrc6P1Volume,     // 5
+                cart::ParamIDs::Vrc6P2Volume,     // 6
+                cart::ParamIDs::FltCutoff,        // 7
+                cart::ParamIDs::FltResonance,     // 8
+                cart::ParamIDs::ChMix,            // 9
+                cart::ParamIDs::DlMix,            // 10
+                cart::ParamIDs::RvMix,            // 11
+                cart::ParamIDs::LfoRate,          // 12
+                cart::ParamIDs::LfoVibratoDepth,  // 13
+                cart::ParamIDs::LfoTremoloDepth   // 14
+            };
+            if (target < 15 && targetParams[target] != nullptr)
+            {
+                if (target >= 2 && target <= 6)
+                    setNormRange (targetParams[target], value01 * 15.0f);
+                else if (target == 7)
+                    setNormRange (targetParams[target], 20.0f * std::pow (1000.0f, value01));
+                else if (target == 8)
+                    setNormRange (targetParams[target], 0.1f + value01 * 4.9f);
+                else
+                    setNorm (targetParams[target], value01);
+            }
+            return true;
+        }
+        return false;
+    };
+
+    if (checkUserCC (userCC1NumParam, userCC1TargetParam)) return;
+    if (checkUserCC (userCC2NumParam, userCC2TargetParam)) return;
+    if (checkUserCC (userCC3NumParam, userCC3TargetParam)) return;
+    if (checkUserCC (userCC4NumParam, userCC4TargetParam)) return;
+
+    switch (cc)
+    {
+        case 1:  setNorm (cart::ParamIDs::LfoVibratoDepth, value01); break;
+        case 11: setNorm (cart::ParamIDs::MasterVolume, value01); break;
+        case 74: setNormRange (cart::ParamIDs::FltCutoff,
+                     20.0f * std::pow (1000.0f, value01)); break;
+        case 71: setNormRange (cart::ParamIDs::FltResonance,
+                     0.1f + value01 * 4.9f); break;
+        case 91: setNorm (cart::ParamIDs::RvMix, value01); break;
+        case 93: setNorm (cart::ParamIDs::ChMix, value01); break;
+        default: break;
     }
 }
 

@@ -37,7 +37,7 @@ void MidiVoiceManager::processMidiMessage (const juce::MidiMessage& msg)
     else if (msg.isController())
     {
         if (onControlChange)
-            onControlChange (msg.getControllerNumber(),
+            onControlChange (ccContext, msg.getControllerNumber(),
                              msg.getControllerValue() / 127.0f);
     }
     else if (msg.isAllNotesOff() || msg.isAllSoundOff())
@@ -65,7 +65,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     static_cast<uint8_t> (vol * 15.0f));
                 apuPtr->pulse1().noteOn();
                 activeNotes[0] = note;
-                if (onNoteGate) onNoteGate (0, true);
+                if (onNoteGate) onNoteGate (gateContext,0, true);
                 break;
             }
             case 2:  // Pulse 2
@@ -77,7 +77,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     static_cast<uint8_t> (vol * 15.0f));
                 apuPtr->pulse2().noteOn();
                 activeNotes[1] = note;
-                if (onNoteGate) onNoteGate (1, true);
+                if (onNoteGate) onNoteGate (gateContext,1, true);
                 break;
             }
             case 3:  // Triangle
@@ -87,7 +87,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                 apuPtr->triangle().setFrequency (porta[2].getCurrentFreq() > 0.0f ? porta[2].getCurrentFreq() : freq);
                 apuPtr->triangle().noteOn();
                 activeNotes[2] = note;
-                if (onNoteGate) onNoteGate (2, true);
+                if (onNoteGate) onNoteGate (gateContext,2, true);
                 break;
             }
             case 10: // Noise
@@ -100,7 +100,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     static_cast<uint8_t> (vol * 15.0f));
                 apuPtr->noise().noteOn();
                 activeNotes[3] = note;
-                if (onNoteGate) onNoteGate (3, true);
+                if (onNoteGate) onNoteGate (gateContext,3, true);
                 break;
             }
             case 4:  // DPCM
@@ -111,7 +111,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     apuPtr->dpcm().loadSample (getDpcmSample (mappedSample));
                 apuPtr->dpcm().noteOn();
                 activeNotes[4] = note;
-                if (onNoteGate) onNoteGate (4, true);
+                if (onNoteGate) onNoteGate (gateContext,4, true);
                 break;
             }
             case 5:  // VRC6 Pulse 1
@@ -124,7 +124,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     apuPtr->vrc6Pulse1().setVolume (static_cast<uint8_t> (vol * 15.0f));
                     apuPtr->vrc6Pulse1().noteOn (startFreq);
                     activeNotes[5] = note;
-                    if (onNoteGate) onNoteGate (5, true);
+                    if (onNoteGate) onNoteGate (gateContext,5, true);
                 }
                 break;
             }
@@ -138,7 +138,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     apuPtr->vrc6Pulse2().setVolume (static_cast<uint8_t> (vol * 15.0f));
                     apuPtr->vrc6Pulse2().noteOn (startFreq);
                     activeNotes[6] = note;
-                    if (onNoteGate) onNoteGate (6, true);
+                    if (onNoteGate) onNoteGate (gateContext,6, true);
                 }
                 break;
             }
@@ -151,7 +151,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
                     float startFreq = porta[7].getCurrentFreq() > 0.0f ? porta[7].getCurrentFreq() : freq;
                     apuPtr->vrc6Saw().noteOn (startFreq);
                     activeNotes[7] = note;
-                    if (onNoteGate) onNoteGate (7, true);
+                    if (onNoteGate) onNoteGate (gateContext,7, true);
                 }
                 break;
             }
@@ -169,7 +169,7 @@ void MidiVoiceManager::handleNoteOn (int channel, int note, float velocity)
             static_cast<uint8_t> (vol * 15.0f));
         apuPtr->pulse1().noteOn();
         activeNotes[0] = note;
-        if (onNoteGate) onNoteGate (0, true);
+        if (onNoteGate) onNoteGate (gateContext,0, true);
     }
     else if (mode == MidiMode::Auto)
     {
@@ -252,7 +252,7 @@ void MidiVoiceManager::handleNoteOff (int channel, int note)
         {
             if (activeNotes[ch] == note)
             {
-                if (onNoteGate) onNoteGate (ch, false);
+                if (onNoteGate) onNoteGate (gateContext,ch, false);
                 channel.noteOff();
                 activeNotes[ch] = -1;
             }
@@ -275,7 +275,7 @@ void MidiVoiceManager::handleNoteOff (int channel, int note)
     {
         if (activeNotes[0] == note)
         {
-            if (onNoteGate) onNoteGate (0, false);
+            if (onNoteGate) onNoteGate (gateContext,0, false);
             apuPtr->pulse1().noteOff();
             activeNotes[0] = -1;
         }
@@ -287,7 +287,7 @@ void MidiVoiceManager::handleNoteOff (int channel, int note)
         {
             if (activeNotes[ch] == note)
             {
-                if (onNoteGate) onNoteGate (ch, false);
+                if (onNoteGate) onNoteGate (gateContext,ch, false);
                 channel.noteOff();
                 activeNotes[ch] = -1;
             }
@@ -369,7 +369,7 @@ void MidiVoiceManager::handleAllNotesOff()
     for (int i = 0; i < 8; ++i)
     {
         if (activeNotes[i] >= 0 && onNoteGate)
-            onNoteGate (i, false);
+            onNoteGate (gateContext, i, false);
     }
 
     if (activeNotes[0] >= 0) { apuPtr->pulse1().noteOff();    activeNotes[0] = -1; }
@@ -526,12 +526,12 @@ void MidiVoiceManager::noteOnChannel (int ch, int note, float vol, float bendSem
     }
     activeNotes[ch] = note;
     noteAge[ch] = ++noteAgeCounter;
-    if (onNoteGate) onNoteGate (ch, true);
+    if (onNoteGate) onNoteGate (gateContext,ch, true);
 }
 
 void MidiVoiceManager::noteOffChannel (int ch)
 {
-    if (onNoteGate) onNoteGate (ch, false);
+    if (onNoteGate) onNoteGate (gateContext,ch, false);
     switch (ch)
     {
         case 0: apuPtr->pulse1().noteOff();    break;

@@ -100,7 +100,7 @@ float NoiseChannel::process()
         clockLfsr();
     }
 
-    return sample * vol;
+    return sample * vol + 1e-25f;
 }
 
 } // namespace cart
