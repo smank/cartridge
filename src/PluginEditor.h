@@ -52,6 +52,7 @@ private:
     static constexpr int statusBarHeight = 28;
     static constexpr int baseWidth = 940;
     static constexpr int baseHeight = 720;
+    static constexpr int maxScalePercent = 200;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CartridgeEditor)
 };

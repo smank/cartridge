@@ -17,31 +17,39 @@ StatusBarComponent::StatusBarComponent (CartridgeProcessor& processor)
     };
     addAndMakeVisible (holdToggle);
 
-    versionLabel.setText ("by smank  |  v" JucePlugin_VersionString, juce::dontSendNotification);
-    versionLabel.setFont (juce::FontOptions (13.0f));
+    versionLabel.setText ("v" JucePlugin_VersionString, juce::dontSendNotification);
+    versionLabel.setFont (juce::FontOptions (11.0f));
     versionLabel.setColour (juce::Label::textColourId, Colors::textDark);
     versionLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (versionLabel);
+
+    startTimerHz (8);
+}
+
+void StatusBarComponent::timerCallback()
+{
+    holdToggle.setToggleState (processorRef.getHoldMode(), juce::dontSendNotification);
+    repaint();
 }
 
 void StatusBarComponent::resized()
 {
-    auto area = getLocalBounds().reduced (4, 0);
-    versionLabel.setBounds (area.removeFromRight (140));
-    holdToggle.setBounds (area.removeFromRight (70));
+    auto area = getLocalBounds().reduced (8, 0);
+    versionLabel.setBounds (area.removeFromRight (80));
+    holdToggle.setBounds (area.removeFromRight (60));
 }
 
 void StatusBarComponent::paint (juce::Graphics& g)
 {
     auto area = getLocalBounds();
 
-    g.setColour (Colors::bgMid);
+    g.setColour (Colors::bgDark);
     g.fillRect (area);
 
-    g.setColour (Colors::divider);
+    g.setColour (Colors::divider.withAlpha (0.5f));
     g.fillRect (area.removeFromTop (1));
 
-    auto font = juce::Font (juce::FontOptions (13.0f));
+    auto font = juce::Font (juce::FontOptions (12.0f));
     g.setFont (font);
 
     float baseline = area.getY() + (area.getHeight() + font.getAscent() - font.getDescent()) * 0.5f;
@@ -56,45 +64,52 @@ void StatusBarComponent::paint (juce::Graphics& g)
         x = ga.getBoundingBox (0, -1, false).getRight();
     };
 
-    drawRun ("Ch: ",  Colors::textSecondary);
-    drawRun (channelNames[currentChannel], Colors::textPrimary);
-    drawRun ("   |   ", Colors::textSecondary);
+    auto drawSep = [&] ()
+    {
+        drawRun ("  \xc2\xb7  ", Colors::textDark);  // centered dot separator
+    };
 
-    drawRun ("Vel: ", Colors::textSecondary);
-    drawRun (juce::String (juce::roundToInt (currentVelocity * 100.0f)) + "%", Colors::textPrimary);
-    drawRun ("   |   ", Colors::textSecondary);
+    // Active voices
+    int activeCount = 0;
+    for (int i = 0; i < 8; ++i)
+        if (processorRef.channelActive[i].load (std::memory_order_relaxed))
+            ++activeCount;
 
-    drawRun ("Oct: ", Colors::textSecondary);
+    if (activeCount > 0)
+    {
+        drawRun (juce::String (activeCount) + " voice" + (activeCount > 1 ? "s" : ""), Colors::accentActive);
+        drawSep();
+    }
+
+    // Engine mode
+    auto* engineParam = processorRef.getApvts().getRawParameterValue (cart::ParamIDs::EngineMode);
+    bool modern = engineParam && static_cast<int> (engineParam->load()) == 1;
+    drawRun (modern ? "Modern" : "Classic", Colors::textPrimary);
+    drawSep();
+
+    // MIDI mode
+    auto* midiParam = processorRef.getApvts().getRawParameterValue (cart::ParamIDs::MidiMode);
+    if (midiParam)
+    {
+        static const char* modeNames[] = { "Split", "Auto", "Mono", "Layer" };
+        int mode = juce::jlimit (0, 3, static_cast<int> (midiParam->load()));
+        drawRun (modeNames[mode], Colors::textSecondary);
+        drawSep();
+    }
+
+    // Octave
     drawRun ("C" + juce::String (4 + currentOctOffset), Colors::textPrimary);
+    drawSep();
 
+    // Velocity
+    drawRun (juce::String (juce::roundToInt (currentVelocity * 100.0f)) + "%", Colors::textSecondary);
+
+    // Sustain pedal indicator
     if (processorRef.getSustainPedal())
     {
-        drawRun ("   |   ", Colors::textSecondary);
+        drawSep();
         drawRun ("SUS", Colors::orangeAccent);
     }
-}
-
-void StatusBarComponent::update (int channelIndex, float velocity,
-                                  int octaveOffset, bool holdMode)
-{
-    bool sustain = processorRef.getSustainPedal();
-    bool changed = channelIndex != currentChannel
-                || std::abs (velocity - currentVelocity) > 0.001f
-                || octaveOffset != currentOctOffset
-                || holdMode != currentHold
-                || sustain != currentSustain;
-
-    if (! changed)
-        return;
-
-    currentChannel   = juce::jlimit (0, 7, channelIndex);
-    currentVelocity  = velocity;
-    currentOctOffset = octaveOffset;
-    currentHold      = holdMode;
-    currentSustain   = sustain;
-
-    holdToggle.setToggleState (holdMode, juce::dontSendNotification);
-    repaint();
 }
 
 } // namespace cart

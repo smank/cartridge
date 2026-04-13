@@ -299,6 +299,15 @@ void CartridgeProcessor::setCurrentProgram (int index)
 {
     currentPreset = index;
     presetManager.applyPreset (index, apvts);
+
+    // Load step sequence data from preset (if embedded)
+    std::array<cart::StepSequenceData, 8> seqData;
+    seqData.fill (cart::StepSequenceData{});
+    presetManager.getPresetStepSeqData (index, seqData);
+    for (int i = 0; i < 8; ++i)
+        stepSequenceData[i] = seqData[static_cast<size_t> (i)];
+    sequenceDataVersion.fetch_add (1, std::memory_order_release);
+
     abCompare.initialize (apvts);   // Re-sync A/B snapshots with new preset
     pendingDspReset.store (true);    // Actual reset deferred to audio thread
 }

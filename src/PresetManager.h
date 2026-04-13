@@ -2,8 +2,10 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Parameters.h"
+#include "dsp/StepSequencer.h"
 #include <vector>
 #include <optional>
+#include <array>
 
 namespace cart {
 
@@ -12,6 +14,10 @@ struct Preset
     juce::String name;
     juce::String category;  // Empty for uncategorized user presets
     std::vector<std::pair<juce::String, float>> values;  // paramID → value
+
+    // Optional step sequence data (populated from VGM imports or presets with embedded seqs)
+    bool hasStepSeqData = false;
+    std::array<StepSequenceData, 8> stepSeqData;
 };
 
 /// Factory + user presets for Cartridge.
@@ -54,6 +60,12 @@ public:
 
     /// Returns 0 for Classic, 1 for Modern engine mode preset
     int getPresetEngineMode (int index) const;
+
+    /// Returns true if the preset at index has embedded step sequence data
+    bool presetHasStepSeqData (int index) const;
+
+    /// Copy step sequence data from preset into dest array. Returns true if data was present.
+    bool getPresetStepSeqData (int index, std::array<StepSequenceData, 8>& dest) const;
 
 private:
     void buildPresets();

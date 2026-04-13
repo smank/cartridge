@@ -170,7 +170,8 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
     setSize (initW, initH);
     setResizable (true, true);
-    setResizeLimits (baseWidth, baseHeight, 3840, 2160);
+    setResizeLimits (baseWidth, baseHeight,
+                     baseWidth * maxScalePercent / 100, baseHeight * maxScalePercent / 100);
     setWantsKeyboardFocus (true);
 
     // Editor keeps focus so shortcut keys ([, ], -, =, Tab, etc.) are handled
@@ -200,6 +201,10 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
         // Re-apply scaled size after native title bar recreates the window peer
         safeThis->setSize (juce::roundToInt (baseWidth * safeThis->currentScale),
                            juce::roundToInt (baseHeight * safeThis->currentScale));
+
+        // Centre the window on screen
+        if (auto* topLevel = safeThis->getTopLevelComponent())
+            topLevel->centreWithSize (topLevel->getWidth(), topLevel->getHeight());
     });
 }
 
@@ -217,7 +222,8 @@ void CartridgeEditor::applyScale (float scale)
     currentScale = scale;
     int w = juce::roundToInt (baseWidth * scale);
     int h = juce::roundToInt (baseHeight * scale);
-    setResizeLimits (baseWidth, baseHeight, 3840, 2160);
+    setResizeLimits (baseWidth, baseHeight,
+                     baseWidth * maxScalePercent / 100, baseHeight * maxScalePercent / 100);
     setSize (w, h);
     saveScalePreference();
 }
@@ -226,19 +232,35 @@ void CartridgeEditor::loadScalePreference()
 {
     auto file = getSettingsFile();
     if (! file.existsAsFile())
+    {
+        // First launch: auto-detect best scale for the primary display
+        auto display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
+        if (display != nullptr)
+        {
+            auto screenArea = display->userArea;
+            float scaleW = static_cast<float> (screenArea.getWidth()) / static_cast<float> (baseWidth);
+            float scaleH = static_cast<float> (screenArea.getHeight()) / static_cast<float> (baseHeight);
+            float fit = juce::jmin (scaleW, scaleH) * 0.9f;  // 90% of screen
+
+            // Snap to nearest scale option
+            if      (fit >= 1.75f) { currentScale = 2.0f;  topBar.setScaleIndex (4); }
+            else if (fit >= 1.45f) { currentScale = 1.5f;  topBar.setScaleIndex (3); }
+            else if (fit >= 1.2f)  { currentScale = 1.25f; topBar.setScaleIndex (2); }
+            else                   { currentScale = 1.0f;  topBar.setScaleIndex (1); }
+        }
         return;
+    }
 
     if (auto xml = juce::parseXML (file))
     {
         float scale = static_cast<float> (xml->getDoubleAttribute ("uiScale", 1.0));
 
-        // Map scale to combo ID: 1.0→1, 1.25→2, 1.5→3
-        // Clamp up any legacy 75% to 100%
         if (scale < 1.0f) scale = 1.0f;
         int comboId = 1;
         if      (scale <= 1.01f) comboId = 1;
         else if (scale <= 1.26f) comboId = 2;
-        else                     comboId = 3;
+        else if (scale <= 1.51f) comboId = 3;
+        else                     comboId = 4;
 
         topBar.setScaleIndex (comboId);
         currentScale = scale;
@@ -262,6 +284,7 @@ void CartridgeEditor::paint (juce::Graphics& g)
 
 void CartridgeEditor::resized()
 {
+    // Use full window bounds — the layout stretches to fill
     auto area = getLocalBounds();
 
     topBar.setBounds (area.removeFromTop (topBarHeight));
@@ -429,7 +452,8 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
             keyboard.setAvailableRange (juce::jmax (0, low), juce::jmin (127, high));
             keyboard.setKeyPressBaseOctave (5 + currentOctaveOffset);
         }
-        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
+        statusBar.setVelocity (currentVelocity);
+        statusBar.setOctaveOffset (currentOctaveOffset);
         return true;
     }
 
@@ -444,7 +468,8 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
             keyboard.setAvailableRange (juce::jmax (0, low), juce::jmin (127, high));
             keyboard.setKeyPressBaseOctave (5 + currentOctaveOffset);
         }
-        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
+        statusBar.setVelocity (currentVelocity);
+        statusBar.setOctaveOffset (currentOctaveOffset);
         return true;
     }
 
@@ -464,7 +489,6 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
         // Map channel index → MIDI channel (matches split-mode routing)
         static constexpr int chToMidi[] = { 1, 2, 3, 10, 4, 5, 6, 7 };
         keyboard.setMidiChannel (chToMidi[fc]);
-        statusBar.update (fc, currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
         return true;
     }
 
@@ -473,7 +497,6 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
     {
         bool current = processorRef.getHoldMode();
         processorRef.setHoldMode (!current);
-        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, !current);
         return true;
     }
 
@@ -482,7 +505,8 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
     {
         currentVelocity = juce::jmax (0.1f, currentVelocity - 0.1f);
         keyboard.setVelocity (currentVelocity, true);
-        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
+        statusBar.setVelocity (currentVelocity);
+        statusBar.setOctaveOffset (currentOctaveOffset);
         return true;
     }
 
@@ -491,7 +515,8 @@ bool CartridgeEditor::keyPressed (const juce::KeyPress& key)
     {
         currentVelocity = juce::jmin (1.0f, currentVelocity + 0.1f);
         keyboard.setVelocity (currentVelocity, true);
-        statusBar.update (channelStrips.getFocusedChannel(), currentVelocity, currentOctaveOffset, processorRef.getHoldMode());
+        statusBar.setVelocity (currentVelocity);
+        statusBar.setOctaveOffset (currentOctaveOffset);
         return true;
     }
 

@@ -7,7 +7,8 @@ class CartridgeProcessor;
 
 namespace cart {
 
-class StatusBarComponent : public juce::Component
+class StatusBarComponent : public juce::Component,
+                           private juce::Timer
 {
 public:
     StatusBarComponent (CartridgeProcessor& processor);
@@ -15,23 +16,18 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
-    void update (int channelIndex, float velocity, int octaveOffset, bool holdMode);
+    void setVelocity (float v) { currentVelocity = v; }
+    void setOctaveOffset (int o) { currentOctOffset = o; }
 
 private:
+    void timerCallback() override;
+
     CartridgeProcessor& processorRef;
     juce::ToggleButton holdToggle;
     juce::Label versionLabel;
-    bool currentSustain = false;
 
-    int    currentChannel     = 0;
     float  currentVelocity    = 0.8f;
     int    currentOctOffset   = 0;
-    bool   currentHold        = false;
-
-    static constexpr const char* channelNames[] = {
-        "Pulse 1", "Pulse 2", "Triangle", "Noise",
-        "DPCM", "VRC6 P1", "VRC6 P2", "VRC6 Saw"
-    };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StatusBarComponent)
 };

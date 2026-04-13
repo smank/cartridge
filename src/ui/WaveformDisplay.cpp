@@ -25,13 +25,13 @@ void WaveformDisplay::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
 
-    // Background
+    // Background with subtle inset
     g.setColour (Colors::bgDark);
-    g.fillRoundedRectangle (bounds, 4.0f);
+    g.fillRoundedRectangle (bounds, 3.0f);
 
-    // Subtle border
-    g.setColour (Colors::divider);
-    g.drawRoundedRectangle (bounds, 4.0f, 0.5f);
+    // Border — thin accent line at bottom for visual weight
+    g.setColour (Colors::divider.withAlpha (0.4f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 0.5f);
 
     if (bounds.getWidth() < 2.0f || bounds.getHeight() < 2.0f)
         return;
@@ -47,9 +47,9 @@ void WaveformDisplay::paint (juce::Graphics& g)
     float midY = bounds.getCentreY();
     float halfH = bounds.getHeight() * 0.45f;
 
-    // Draw centre line (dim)
-    g.setColour (Colors::textDark.withAlpha (0.3f));
-    g.drawHorizontalLine (static_cast<int> (midY), bounds.getX(), bounds.getRight());
+    // Draw centre line
+    g.setColour (Colors::textDark.withAlpha (0.2f));
+    g.fillRect (bounds.getX() + 4.0f, midY, bounds.getWidth() - 8.0f, 1.0f);
 
     // Compute animation blend: 1.0 = full intro, 0.0 = full live
     float introAlpha = 0.0f;
@@ -89,16 +89,18 @@ void WaveformDisplay::paint (juce::Graphics& g)
         }
     }
 
-    // Draw waveform
+    // Draw waveform with glow effect
+    g.setColour (Colors::accentActive.withAlpha (0.15f));
+    g.strokePath (path, juce::PathStrokeType (3.5f));
     g.setColour (Colors::accentActive);
-    g.strokePath (path, juce::PathStrokeType (1.2f));
+    g.strokePath (path, juce::PathStrokeType (1.5f));
 
-    // Persistent subtle app name watermark (very low alpha, behind waveform)
+    // Subtle watermark
     if (introAlpha < 1.0f)
     {
-        float watermarkAlpha = (1.0f - introAlpha) * 0.08f;
-        g.setColour (Colors::accentActive.withAlpha (watermarkAlpha));
-        g.setFont (juce::FontOptions (bounds.getHeight() * 0.35f));
+        float watermarkAlpha = (1.0f - introAlpha) * 0.06f;
+        g.setColour (Colors::textDark.withAlpha (watermarkAlpha));
+        g.setFont (juce::FontOptions (bounds.getHeight() * 0.30f));
         g.drawText ("CARTRIDGE", bounds.toNearestInt(), juce::Justification::centred);
     }
 }

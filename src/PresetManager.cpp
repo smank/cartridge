@@ -67,6 +67,38 @@ void PresetManager::savePresetToFile (const Preset& preset, const juce::File& fi
         paramEl->setAttribute ("value", static_cast<double> (value));
     }
 
+    // Save step sequence data if present
+    if (preset.hasStepSeqData)
+    {
+        for (int ch = 0; ch < 8; ++ch)
+        {
+            const auto& sd = preset.stepSeqData[static_cast<size_t> (ch)];
+            bool hasData = sd.numVolumeSteps > 0 || sd.numPitchSteps > 0 || sd.numDutySteps > 0;
+            if (!hasData) continue;
+
+            auto* seqEl = xml->createNewChildElement ("StepSeq");
+            seqEl->setAttribute ("ch", ch);
+            seqEl->setAttribute ("numVol", sd.numVolumeSteps);
+            seqEl->setAttribute ("numPitch", sd.numPitchSteps);
+            seqEl->setAttribute ("numDuty", sd.numDutySteps);
+            seqEl->setAttribute ("volLoop", sd.volumeLoop);
+            seqEl->setAttribute ("pitchLoop", sd.pitchLoop);
+            seqEl->setAttribute ("dutyLoop", sd.dutyLoop);
+
+            auto joinInts = [] (const int* arr, int count) -> juce::String
+            {
+                juce::String s;
+                for (int i = 0; i < count; ++i)
+                    s += (i > 0 ? "," : "") + juce::String (arr[i]);
+                return s;
+            };
+
+            if (sd.numVolumeSteps > 0) seqEl->setAttribute ("vol",   joinInts (sd.volumeSteps, sd.numVolumeSteps));
+            if (sd.numPitchSteps > 0)  seqEl->setAttribute ("pitch", joinInts (sd.pitchSteps, sd.numPitchSteps));
+            if (sd.numDutySteps > 0)   seqEl->setAttribute ("duty",  joinInts (sd.dutySteps, sd.numDutySteps));
+        }
+    }
+
     xml->writeTo (file);
 }
 
@@ -80,13 +112,39 @@ std::optional<Preset> PresetManager::loadPresetFromFile (const juce::File& file)
     p.name = xml->getStringAttribute ("name", file.getFileNameWithoutExtension());
     p.category = xml->getStringAttribute ("category", "");
 
-    for (auto* paramEl : xml->getChildIterator())
+    for (auto* el : xml->getChildIterator())
     {
-        if (paramEl->hasTagName ("Param"))
+        if (el->hasTagName ("Param"))
         {
-            auto id = paramEl->getStringAttribute ("id");
-            auto val = static_cast<float> (paramEl->getDoubleAttribute ("value"));
+            auto id = el->getStringAttribute ("id");
+            auto val = static_cast<float> (el->getDoubleAttribute ("value"));
             p.values.push_back ({ id, val });
+        }
+        else if (el->hasTagName ("StepSeq"))
+        {
+            int ch = el->getIntAttribute ("ch", -1);
+            if (ch < 0 || ch >= 8) continue;
+
+            p.hasStepSeqData = true;
+            auto& sd = p.stepSeqData[static_cast<size_t> (ch)];
+            sd.numVolumeSteps = el->getIntAttribute ("numVol", 0);
+            sd.numPitchSteps  = el->getIntAttribute ("numPitch", 0);
+            sd.numDutySteps   = el->getIntAttribute ("numDuty", 0);
+            sd.volumeLoop     = el->getBoolAttribute ("volLoop", false);
+            sd.pitchLoop      = el->getBoolAttribute ("pitchLoop", false);
+            sd.dutyLoop       = el->getBoolAttribute ("dutyLoop", false);
+
+            auto parseInts = [] (const juce::String& str, int* dest, int maxCount)
+            {
+                juce::StringArray tokens;
+                tokens.addTokens (str, ",", "");
+                for (int i = 0; i < juce::jmin (tokens.size(), maxCount); ++i)
+                    dest[i] = tokens[i].getIntValue();
+            };
+
+            parseInts (el->getStringAttribute ("vol"),   sd.volumeSteps, StepSequenceData::kMaxSteps);
+            parseInts (el->getStringAttribute ("pitch"), sd.pitchSteps,  StepSequenceData::kMaxSteps);
+            parseInts (el->getStringAttribute ("duty"),  sd.dutySteps,   StepSequenceData::kMaxSteps);
         }
     }
 
@@ -1060,6 +1118,26 @@ int PresetManager::getPresetEngineMode (int index) const
         }
     }
     return 0;  // Default to Classic
+}
+
+bool PresetManager::presetHasStepSeqData (int index) const
+{
+    if (auto* p = getPreset (index))
+        return p->hasStepSeqData;
+    return false;
+}
+
+bool PresetManager::getPresetStepSeqData (int index, std::array<StepSequenceData, 8>& dest) const
+{
+    if (auto* p = getPreset (index))
+    {
+        if (p->hasStepSeqData)
+        {
+            dest = p->stepSeqData;
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace cart

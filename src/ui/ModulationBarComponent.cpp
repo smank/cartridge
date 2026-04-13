@@ -234,11 +234,11 @@ void ModulationBarComponent::collapseAll()
 void ModulationBarComponent::styleKnob (juce::Slider& knob)
 {
     knob.setSliderStyle (juce::Slider::LinearHorizontal);
-    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 48, 16);
+    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 14);
     knob.setColour (juce::Slider::trackColourId, Colors::accentActive);
     knob.setColour (juce::Slider::thumbColourId, Colors::accentActive);
-    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline);
-    knob.setColour (juce::Slider::textBoxTextColourId, Colors::textPrimary);
+    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline.withAlpha (0.5f));
+    knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
     knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     knob.setPopupMenuEnabled (true);
 }
@@ -332,7 +332,9 @@ void ModulationBarComponent::paint (juce::Graphics& g)
     g.setColour (Colors::bgMid);
     g.fillRect (headerArea);
 
-    // Draw each header section
+    g.setColour (Colors::divider.withAlpha (0.3f));
+    g.fillRect (headerArea.getX(), headerArea.getY(), headerArea.getWidth(), 1);
+
     const juce::String modNames[] = { "LFO", "PORTA", "ARP", "DPCM", "SEQ" };
     const juce::ToggleButton* enableButtons[] = { &lfoEnable, &portaEnable, &arpEnable, nullptr, &seqEnable };
 
@@ -342,7 +344,6 @@ void ModulationBarComponent::paint (juce::Graphics& g)
         bool enabled = enableButtons[i] != nullptr && enableButtons[i]->getToggleState();
         bool expanded = (expandedMod == i);
 
-        // Highlight expanded section
         if (expanded)
         {
             g.setColour (Colors::bgLight);
@@ -351,69 +352,63 @@ void ModulationBarComponent::paint (juce::Graphics& g)
 
         if (enableButtons[i] != nullptr)
         {
-            // LED circle
-            auto ledBounds = section.withWidth (28).withSizeKeepingCentre (12, 12).toFloat();
+            auto ledBounds = section.withWidth (26).withSizeKeepingCentre (8, 8).toFloat();
             if (enabled)
             {
                 g.setColour (Colors::accentActive);
                 g.fillEllipse (ledBounds);
+                g.setColour (Colors::accentActive.withAlpha (0.2f));
+                g.fillEllipse (ledBounds.expanded (3.0f));
             }
             else
             {
-                g.setColour (Colors::knobOutline);
-                g.drawEllipse (ledBounds, 1.5f);
+                g.setColour (Colors::knobOutline.withAlpha (0.6f));
+                g.drawEllipse (ledBounds, 1.0f);
             }
         }
 
-        // Mod name
-        auto textArea = (enableButtons[i] != nullptr) ? section.withTrimmedLeft (28) : section;
+        auto textArea = (enableButtons[i] != nullptr) ? section.withTrimmedLeft (26) : section;
         g.setColour (enabled ? Colors::textPrimary : Colors::textSecondary);
-        g.setFont (juce::FontOptions (12.0f));
+        g.setFont (juce::FontOptions (11.0f));
 
-        juce::String suffix = expanded ? juce::String::charToString (0x25BC) : "";
-        // DPCM uses a right-arrow since it has no enable toggle
-        if (i == MOD_DPCM)
-        {
-            g.setColour (Colors::textSecondary);
-            suffix = expanded ? juce::String::charToString (0x25BC) : juce::String::charToString (0x25B8);
-        }
-        g.drawText (modNames[i] + " " + suffix, textArea, juce::Justification::centredLeft);
+        juce::String label = modNames[i];
+        if (expanded) label += " " + juce::String::charToString (0x25BE);
+        else if (i == MOD_DPCM) label += " " + juce::String::charToString (0x25B8);
+        g.drawText (label, textArea, juce::Justification::centredLeft);
 
-        // Vertical divider (except after last)
         if (i < NUM_MOD - 1)
         {
-            g.setColour (Colors::divider);
-            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 4.0f,
-                                (float) headerArea.getBottom() - 4.0f);
+            g.setColour (Colors::divider.withAlpha (0.25f));
+            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 6.0f,
+                                (float) headerArea.getBottom() - 6.0f);
         }
     }
 
-    // ─── Detail area background ────────────────────────────────────────
+    // ─── Detail area ────────────────────────────────────────────────────
     if (expandedMod >= 0)
     {
         auto detailArea = getLocalBounds().withTop (headerHeight);
         g.setColour (Colors::bgLight);
         g.fillRect (detailArea);
 
-        // Top border line
-        g.setColour (Colors::accentActive.withAlpha (0.4f));
-        g.drawHorizontalLine (headerHeight, 0.0f, (float) getWidth());
+        g.setColour (Colors::accentActive.withAlpha (0.3f));
+        g.fillRect (0, headerHeight, getWidth(), 1);
     }
 }
 
 void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int modIndex)
 {
-    const int labelW = 65;
-    const int comboH = 22;
+    const int labelW = 56;
+    const int comboH = 20;
 
-    area = area.reduced (8, 4);
+    area = area.reduced (10, 6);
 
     auto layoutRow = [&] (juce::Rectangle<int>& a, juce::Slider& slider, juce::Label& label, int rowH)
     {
         auto row = a.removeFromTop (rowH);
         label.setJustificationType (juce::Justification::centredRight);
         label.setBounds (row.removeFromLeft (labelW));
-        row.removeFromLeft (4);
+        row.removeFromLeft (6);
         slider.setBounds (row);
     };
 
@@ -429,12 +424,11 @@ void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int m
         }
         case MOD_PORTA:
         {
-            // Single slider, vertically centred
             auto centred = area.withHeight (juce::jmin (24, area.getHeight()));
             centred.setCentre (area.getCentreX(), area.getCentreY());
             portaTimeLabel.setJustificationType (juce::Justification::centredRight);
             portaTimeLabel.setBounds (centred.removeFromLeft (labelW));
-            centred.removeFromLeft (4);
+            centred.removeFromLeft (6);
             portaTime.setBounds (centred);
             break;
         }
@@ -442,50 +436,49 @@ void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int m
         {
             int rowH = area.getHeight() / 5;
 
-            // Pattern combo row
             auto comboRow = area.removeFromTop (rowH);
             arpPatternLabel.setJustificationType (juce::Justification::centredRight);
             arpPatternLabel.setBounds (comboRow.removeFromLeft (labelW));
-            comboRow.removeFromLeft (4);
-            arpPattern.setBounds (comboRow.removeFromLeft (juce::jmin (100, comboRow.getWidth())));
+            comboRow.removeFromLeft (6);
+            arpPattern.setBounds (comboRow.removeFromLeft (juce::jmin (90, comboRow.getWidth())));
 
             layoutRow (area, arpRate, arpRateLabel, rowH);
             layoutRow (area, arpOctaves, arpOctavesLabel, rowH);
             layoutRow (area, arpGate, arpGateLabel, rowH);
 
-            // Sync row
+            // Sync row — aligned with label column
             auto syncRow = area;
-            arpSyncToggle.setBounds (syncRow.removeFromLeft (60));
+            syncRow.removeFromLeft (labelW + 6);
+            arpSyncToggle.setBounds (syncRow.removeFromLeft (52));
             syncRow.removeFromLeft (4);
-            arpSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (80, syncRow.getWidth()))
-                                       .withHeight (juce::jmin (comboH, syncRow.getHeight())));
+            arpSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (75, syncRow.getWidth()))
+                                       .withHeight (comboH));
             break;
         }
         case MOD_DPCM:
         {
-            int labelH = 16;
             auto centred = area.withSizeKeepingCentre (area.getWidth() / 2, area.getHeight());
             dpcmSampleLabel.setJustificationType (juce::Justification::centred);
-            dpcmSampleLabel.setBounds (centred.removeFromTop (labelH));
-            auto row = centred.removeFromTop (comboH + 4);
-            int cw = juce::jmax (80, row.getWidth() - 60);
+            dpcmSampleLabel.setBounds (centred.removeFromTop (14));
+            centred.removeFromTop (2);
+            auto row = centred.removeFromTop (comboH + 2);
+            int cw = juce::jmax (80, row.getWidth() - 56);
             dpcmSample.setBounds (row.removeFromLeft (cw));
             row.removeFromLeft (4);
-            dpcmLoadButton.setBounds (row.removeFromLeft (50).withHeight (comboH));
+            dpcmLoadButton.setBounds (row.removeFromLeft (46).withHeight (comboH));
             break;
         }
         case MOD_SEQ:
         {
-            // Top controls row: Rate slider + Sync toggle + Sync division
             auto ctrlRow = area.removeFromTop (24);
             seqRateLabel.setJustificationType (juce::Justification::centredRight);
             seqRateLabel.setBounds (ctrlRow.removeFromLeft (labelW));
-            ctrlRow.removeFromLeft (4);
-            seqRate.setBounds (ctrlRow.removeFromLeft (juce::jmin (200, ctrlRow.getWidth())));
+            ctrlRow.removeFromLeft (6);
+            seqRate.setBounds (ctrlRow.removeFromLeft (juce::jmin (180, ctrlRow.getWidth())));
             ctrlRow.removeFromLeft (8);
-            seqSyncToggle.setBounds (ctrlRow.removeFromLeft (60));
+            seqSyncToggle.setBounds (ctrlRow.removeFromLeft (52));
             ctrlRow.removeFromLeft (4);
-            seqSyncDiv.setBounds (ctrlRow.removeFromLeft (juce::jmin (80, ctrlRow.getWidth()))
+            seqSyncDiv.setBounds (ctrlRow.removeFromLeft (juce::jmin (75, ctrlRow.getWidth()))
                                         .withHeight (juce::jmin (comboH, ctrlRow.getHeight())));
 
             // Step grid fills remaining space

@@ -236,11 +236,11 @@ void EffectsBarComponent::collapseAll()
 void EffectsBarComponent::styleKnob (juce::Slider& knob)
 {
     knob.setSliderStyle (juce::Slider::LinearHorizontal);
-    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 48, 16);
+    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 14);
     knob.setColour (juce::Slider::trackColourId, Colors::fxAccent);
     knob.setColour (juce::Slider::thumbColourId, Colors::fxAccent);
-    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline);
-    knob.setColour (juce::Slider::textBoxTextColourId, Colors::textPrimary);
+    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline.withAlpha (0.5f));
+    knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
     knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     knob.setPopupMenuEnabled (true);
 }
@@ -331,7 +331,10 @@ void EffectsBarComponent::paint (juce::Graphics& g)
     g.setColour (Colors::bgMid);
     g.fillRect (headerArea);
 
-    // Draw each header section
+    // Top edge accent
+    g.setColour (Colors::divider.withAlpha (0.3f));
+    g.fillRect (headerArea.getX(), headerArea.getY(), headerArea.getWidth(), 1);
+
     const juce::String fxNames[] = { "CRUSH", "FILTER", "CHORUS", "DELAY", "REVERB" };
     const juce::ToggleButton* enableButtons[] = { &bcEnable, &fltEnable, &chEnable, &dlEnable, &rvEnable };
 
@@ -341,70 +344,79 @@ void EffectsBarComponent::paint (juce::Graphics& g)
         bool enabled = enableButtons[i]->getToggleState();
         bool expanded = (expandedEffect == i);
 
-        // Highlight expanded section
         if (expanded)
         {
             g.setColour (Colors::bgLight);
             g.fillRect (section);
         }
 
-        // LED circle
-        auto ledBounds = section.withWidth (28).withSizeKeepingCentre (12, 12).toFloat();
+        // LED — smaller, cleaner
+        auto ledBounds = section.withWidth (26).withSizeKeepingCentre (8, 8).toFloat();
         if (enabled)
         {
             g.setColour (Colors::fxAccent);
             g.fillEllipse (ledBounds);
+            // Glow
+            g.setColour (Colors::fxAccent.withAlpha (0.2f));
+            g.fillEllipse (ledBounds.expanded (3.0f));
         }
         else
         {
-            g.setColour (Colors::knobOutline);
-            g.drawEllipse (ledBounds, 1.5f);
+            g.setColour (Colors::knobOutline.withAlpha (0.6f));
+            g.drawEllipse (ledBounds, 1.0f);
         }
 
-        // Effect name
-        auto textArea = section.withTrimmedLeft (28);
+        auto textArea = section.withTrimmedLeft (26);
         g.setColour (enabled ? Colors::textPrimary : Colors::textSecondary);
-        g.setFont (juce::FontOptions (12.0f));
-        g.drawText (fxNames[i] + (expanded ? juce::String::charToString (0x25BC) : ""),
-                    textArea, juce::Justification::centredLeft);
+        g.setFont (juce::FontOptions (11.0f));
 
-        // Vertical divider (except after last)
+        juce::String label = fxNames[i];
+        if (expanded) label += " " + juce::String::charToString (0x25BE);
+        g.drawText (label, textArea, juce::Justification::centredLeft);
+
         if (i < NUM_FX - 1)
         {
-            g.setColour (Colors::divider);
-            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 4.0f,
-                                (float) headerArea.getBottom() - 4.0f);
+            g.setColour (Colors::divider.withAlpha (0.25f));
+            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 6.0f,
+                                (float) headerArea.getBottom() - 6.0f);
         }
     }
 
-    // ─── Detail area background ────────────────────────────────────────
+    // ─── Detail area ────────────────────────────────────────────────────
     if (expandedEffect >= 0)
     {
         auto detailArea = getLocalBounds().withTop (headerHeight);
         g.setColour (Colors::bgLight);
         g.fillRect (detailArea);
 
-        // Top border line
-        g.setColour (Colors::fxAccent.withAlpha (0.4f));
-        g.drawHorizontalLine (headerHeight, 0.0f, (float) getWidth());
+        g.setColour (Colors::fxAccent.withAlpha (0.3f));
+        g.fillRect (0, headerHeight, getWidth(), 1);
     }
 }
 
 void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIndex)
 {
-    const int labelW = 65;
-    const int comboH = 22;
+    const int labelW = 56;
+    const int comboH = 20;
 
-    area = area.reduced (8, 4);
+    area = area.reduced (10, 6);
 
-    // Compute row height to fill available space
     auto layoutRow = [&] (juce::Rectangle<int>& a, juce::Slider& slider, juce::Label& label, int rowH)
     {
         auto row = a.removeFromTop (rowH);
         label.setJustificationType (juce::Justification::centredRight);
         label.setBounds (row.removeFromLeft (labelW));
-        row.removeFromLeft (4);
+        row.removeFromLeft (6);
         slider.setBounds (row);
+    };
+
+    auto layoutComboRow = [&] (juce::Rectangle<int>& a, juce::ComboBox& combo, juce::Label& label, int rowH)
+    {
+        auto row = a.removeFromTop (rowH);
+        label.setJustificationType (juce::Justification::centredRight);
+        label.setBounds (row.removeFromLeft (labelW));
+        row.removeFromLeft (6);
+        combo.setBounds (row.removeFromLeft (juce::jmin (75, row.getWidth())).withHeight (comboH));
     };
 
     switch (fxIndex)
@@ -420,13 +432,7 @@ void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIn
         case FX_FILTER:
         {
             int rowH = area.getHeight() / 3;
-            // Type combo row
-            auto comboRow = area.removeFromTop (rowH);
-            fltTypeLabel.setJustificationType (juce::Justification::centredRight);
-            fltTypeLabel.setBounds (comboRow.removeFromLeft (labelW));
-            comboRow.removeFromLeft (4);
-            fltType.setBounds (comboRow.removeFromLeft (juce::jmin (80, comboRow.getWidth())));
-
+            layoutComboRow (area, fltType, fltTypeLabel, rowH);
             layoutRow (area, fltCutoff, fltCutoffLabel, rowH);
             layoutRow (area, fltResonance, fltResonanceLabel, area.getHeight());
             break;
@@ -446,11 +452,13 @@ void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIn
             layoutRow (area, dlFeedback, dlFeedbackLabel, rowH);
             layoutRow (area, dlMix, dlMixLabel, rowH);
 
-            // Sync row
+            // Sync row — aligned with label column
             auto syncRow = area;
-            dlSyncToggle.setBounds (syncRow.removeFromLeft (60));
+            syncRow.removeFromLeft (labelW + 6);
+            dlSyncToggle.setBounds (syncRow.removeFromLeft (52));
             syncRow.removeFromLeft (4);
-            dlSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (80, syncRow.getWidth())).withHeight (juce::jmin (comboH, syncRow.getHeight())));
+            dlSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (75, syncRow.getWidth()))
+                                       .withHeight (comboH));
             break;
         }
         case FX_REVERB:

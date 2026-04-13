@@ -1,5 +1,6 @@
 #include "TopBarComponent.h"
 #include "PluginProcessor.h"
+#include "../import/VgmImporter.h"
 
 namespace cart {
 
@@ -71,7 +72,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         auto chooser = std::make_shared<juce::FileChooser> (
             "Import Preset or Bank",
             juce::File::getSpecialLocation (juce::File::userDesktopDirectory),
-            "*.cartpreset;*.cartbank;*.xml");
+            "*.cartpreset;*.cartbank;*.xml;*.vgm;*.vgz");
 
         chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
             [this, chooser] (const juce::FileChooser& fc)
@@ -80,9 +81,40 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
                 if (! file.existsAsFile()) return;
 
                 auto& pm = processorRef.getPresetManager();
+                auto ext = file.getFileExtension().toLowerCase();
                 int result = -1;
 
-                if (file.getFileExtension() == ".cartbank")
+                DBG ("Import file: " + file.getFullPathName());
+                DBG ("Extension: [" + ext + "]");
+
+                if (ext == ".vgm" || ext == ".vgz")
+                {
+                    auto vgmResult = VgmImporter::importFile (file, pm);
+                    if (vgmResult.success)
+                    {
+                        populatePresets();
+                        // Select the first imported preset
+                        result = pm.getNumPresets() - vgmResult.numInstruments;
+                        if (result >= 0)
+                            selectPreset (result);
+
+                        juce::AlertWindow::showMessageBoxAsync (
+                            juce::MessageBoxIconType::InfoIcon,
+                            "VGM Import",
+                            "Imported " + juce::String (vgmResult.numInstruments)
+                                + " instruments from \"" + vgmResult.gameName + "\"");
+                    }
+                    else
+                    {
+                        juce::AlertWindow::showMessageBoxAsync (
+                            juce::MessageBoxIconType::WarningIcon,
+                            "VGM Import Failed",
+                            vgmResult.error);
+                    }
+                    return;
+                }
+
+                if (ext == ".cartbank")
                     result = pm.importBank (file) > 0 ? pm.getNumPresets() - 1 : -1;
                 else
                     result = pm.importPreset (file);
@@ -178,8 +210,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::MasterVolume, masterVolSlider);
 
     masterVolLabel.setText ("Vol", juce::dontSendNotification);
-    masterVolLabel.setFont (juce::FontOptions (11.0f));
+    masterVolLabel.setFont (juce::FontOptions (12.0f));
     masterVolLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    masterVolLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (masterVolLabel);
 
     // ─── Master Tune ─────────────────────────────────────────────────────
@@ -195,8 +228,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::MasterTune, masterTuneSlider);
 
     masterTuneLabel.setText ("Tune", juce::dontSendNotification);
-    masterTuneLabel.setFont (juce::FontOptions (11.0f));
+    masterTuneLabel.setFont (juce::FontOptions (12.0f));
     masterTuneLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    masterTuneLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (masterTuneLabel);
 
     // ─── Region Combo ────────────────────────────────────────────────────
@@ -236,8 +270,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::VelocitySens, velocitySensSlider);
 
     velocitySensLabel.setText ("Vel", juce::dontSendNotification);
-    velocitySensLabel.setFont (juce::FontOptions (11.0f));
+    velocitySensLabel.setFont (juce::FontOptions (12.0f));
     velocitySensLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    velocitySensLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (velocitySensLabel);
 
     // ─── Pitch Bend Range ─────────────────────────────────────────────────
@@ -253,8 +288,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::PitchBendRange, pitchBendSlider);
 
     pitchBendLabel.setText ("Bend", juce::dontSendNotification);
-    pitchBendLabel.setFont (juce::FontOptions (11.0f));
+    pitchBendLabel.setFont (juce::FontOptions (12.0f));
     pitchBendLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    pitchBendLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (pitchBendLabel);
 
     // ─── Engine Mode ────────────────────────────────────────────────────
@@ -286,6 +322,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     scaleCombo.addItem ("100%", 1);
     scaleCombo.addItem ("125%", 2);
     scaleCombo.addItem ("150%", 3);
+    scaleCombo.addItem ("200%", 4);
     scaleCombo.setTooltip ("UI scale factor");
     scaleCombo.setSelectedId (1, juce::dontSendNotification);
     scaleCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
@@ -293,9 +330,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     scaleCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     scaleCombo.onChange = [this]
     {
-        static constexpr float scales[] = { 1.0f, 1.25f, 1.5f };
+        static constexpr float scales[] = { 1.0f, 1.25f, 1.5f, 2.0f };
         int idx = scaleCombo.getSelectedId() - 1;
-        if (idx >= 0 && idx < 3 && onScaleChanged)
+        if (idx >= 0 && idx < 4 && onScaleChanged)
             onScaleChanged (scales[idx]);
     };
     addAndMakeVisible (scaleCombo);
@@ -546,88 +583,102 @@ void TopBarComponent::mouseDoubleClick (const juce::MouseEvent&)
 
 void TopBarComponent::paint (juce::Graphics& g)
 {
-    g.setColour (Colors::bgMid);
-    g.fillRect (getLocalBounds());
+    // Subtle gradient background
+    auto bounds = getLocalBounds().toFloat();
+    g.setGradientFill (juce::ColourGradient (
+        Colors::bgMid, 0.0f, 0.0f,
+        Colors::bgMid.darker (0.15f), 0.0f, bounds.getHeight(),
+        false));
+    g.fillRect (bounds);
 
-    // Bottom divider line
-    g.setColour (Colors::divider);
+    // Row dividers — subtle horizontal lines between rows
+    int rowH = (getHeight() - 6) / 3;
+    g.setColour (Colors::divider.withAlpha (0.3f));
+    g.fillRect (8, 3 + rowH, getWidth() - 16, 1);
+    g.fillRect (8, 3 + rowH * 2, getWidth() - 16, 1);
+
+    // Bottom edge
+    g.setColour (Colors::accentActive.withAlpha (0.4f));
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 }
 
 void TopBarComponent::resized()
 {
-    auto bounds = getLocalBounds().reduced (6, 3);
+    auto bounds = getLocalBounds().reduced (8, 3);
     int rowH = bounds.getHeight() / 3;
+    constexpr int gap = 4;
 
-    // ─── Row 1: Preset navigation + A/B ─────────────────────────────────
-    auto row1 = bounds.removeFromTop (rowH).reduced (0, 1);
+    // ─── Row 1: Preset navigation + actions ─────────────────────────────
+    auto row1 = bounds.removeFromTop (rowH).reduced (0, 2);
 
-    // Left: [<][>] [===preset===]  then action buttons spread across remaining space
-    {
-        // Nav arrows side by side (no gap between them)
-        prevButton.setBounds (row1.removeFromLeft (24));
-        nextButton.setBounds (row1.removeFromLeft (24));
-        row1.removeFromLeft (4);
+    prevButton.setBounds (row1.removeFromLeft (26));
+    row1.removeFromLeft (2);
+    nextButton.setBounds (row1.removeFromLeft (26));
+    row1.removeFromLeft (gap);
 
-        // Preset dropdown — wider, top-left anchor
-        presetCombo.setBounds (row1.removeFromLeft (280));
-        row1.removeFromLeft (8);
+    // A/B button on far right
+    abButton.setBounds (row1.removeFromRight (32));
+    row1.removeFromRight (gap);
+    panicButton.setBounds (row1.removeFromRight (36));
+    row1.removeFromRight (gap);
 
-        // Action buttons fill remaining space equally with small gaps
-        constexpr int numBtns = 6;
-        constexpr int btnGap = 4;
-        int btnW = (row1.getWidth() - btnGap * (numBtns - 1)) / numBtns;
+    // Preset dropdown — takes generous space
+    int presetW = juce::jmin (300, row1.getWidth() / 2);
+    presetCombo.setBounds (row1.removeFromLeft (presetW));
+    row1.removeFromLeft (gap);
 
-        saveButton.setBounds   (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
-        importButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
-        exportButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
-        deleteButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
-        panicButton.setBounds  (row1.removeFromLeft (btnW)); row1.removeFromLeft (btnGap);
-        abButton.setBounds     (row1);
-    }
+    // Remaining action buttons fill equally
+    constexpr int numBtns = 4;
+    int btnW = (row1.getWidth() - gap * (numBtns - 1)) / numBtns;
+    btnW = juce::jmax (btnW, 40);
 
-    // ─── Row 2: Engine, Region, MIDI mode, VRC6, Scale, MIDI info ───────
-    auto row2 = bounds.removeFromTop (rowH).reduced (0, 1);
+    saveButton.setBounds   (row1.removeFromLeft (btnW)); row1.removeFromLeft (gap);
+    importButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (gap);
+    exportButton.setBounds (row1.removeFromLeft (btnW)); row1.removeFromLeft (gap);
+    deleteButton.setBounds (row1);
+
+    // ─── Row 2: Engine, Region, MIDI, VRC6 — consistent gaps ────────────
+    auto row2 = bounds.removeFromTop (rowH).reduced (0, 2);
 
     engineModeCombo.setBounds (row2.removeFromLeft (78));
-    row2.removeFromLeft (4);
-    regionCombo.setBounds (row2.removeFromLeft (65));
-    row2.removeFromLeft (4);
-    midiModeCombo.setBounds (row2.removeFromLeft (65));
-    row2.removeFromLeft (6);
-    vrc6Toggle.setBounds (row2.removeFromLeft (60));
+    row2.removeFromLeft (gap);
+    regionCombo.setBounds (row2.removeFromLeft (62));
+    row2.removeFromLeft (gap);
+    midiModeCombo.setBounds (row2.removeFromLeft (62));
+    row2.removeFromLeft (gap);
+    vrc6Toggle.setBounds (row2.removeFromLeft (58));
 
-    // Right side of row 2
+    // Right side
     if (audioSettingsButton.isVisible())
     {
         audioSettingsButton.setBounds (row2.removeFromRight (62));
-        row2.removeFromRight (4);
+        row2.removeFromRight (gap);
     }
-    midiInfoButton.setBounds (row2.removeFromRight (42));
-    row2.removeFromRight (4);
-    scaleCombo.setBounds (row2.removeFromRight (65));
+    scaleCombo.setBounds (row2.removeFromRight (60));
+    row2.removeFromRight (gap);
+    midiInfoButton.setBounds (row2.removeFromRight (40));
 
-    // ─── Row 3: Sliders ─────────────────────────────────────────────────
-    auto row3 = bounds.reduced (0, 1);
+    // ─── Row 3: Master sliders — uniform label widths ───────────────────
+    auto row3 = bounds.reduced (0, 2);
 
-    int labelSpace = 28 + 34 + 26 + 34;
-    int gaps = 8 * 3;
-    int sliderW = (row3.getWidth() - labelSpace - gaps) / 4;
+    constexpr int labelW = 32;
+    int sliderW = (row3.getWidth() - labelW * 4 - gap * 3) / 4;
+    sliderW = juce::jmax (sliderW, 40);
 
-    masterVolLabel.setBounds (row3.removeFromLeft (28));
-    masterVolSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
-    row3.removeFromLeft (8);
+    masterVolLabel.setBounds (row3.removeFromLeft (labelW));
+    masterVolSlider.setBounds (row3.removeFromLeft (sliderW));
+    row3.removeFromLeft (gap);
 
-    masterTuneLabel.setBounds (row3.removeFromLeft (34));
-    masterTuneSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
-    row3.removeFromLeft (8);
+    masterTuneLabel.setBounds (row3.removeFromLeft (labelW));
+    masterTuneSlider.setBounds (row3.removeFromLeft (sliderW));
+    row3.removeFromLeft (gap);
 
-    velocitySensLabel.setBounds (row3.removeFromLeft (26));
-    velocitySensSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
-    row3.removeFromLeft (8);
+    velocitySensLabel.setBounds (row3.removeFromLeft (labelW));
+    velocitySensSlider.setBounds (row3.removeFromLeft (sliderW));
+    row3.removeFromLeft (gap);
 
-    pitchBendLabel.setBounds (row3.removeFromLeft (34));
-    pitchBendSlider.setBounds (row3.removeFromLeft (juce::jmax (sliderW, 40)));
+    pitchBendLabel.setBounds (row3.removeFromLeft (labelW));
+    pitchBendSlider.setBounds (row3);
 }
 
 } // namespace cart

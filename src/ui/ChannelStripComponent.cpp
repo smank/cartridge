@@ -483,22 +483,26 @@ void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeS
 void ChannelStripComponent::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat().reduced (1.0f);
-    const float cornerR = 6.0f;
+    const float cornerR = 4.0f;
 
     // Rounded background
     g.setColour (Colors::bgStrip);
     g.fillRoundedRectangle (bounds, cornerR);
 
     // Subtle outline
-    g.setColour (Colors::divider);
-    g.drawRoundedRectangle (bounds, cornerR, 0.5f);
+    g.setColour (Colors::divider.withAlpha (0.4f));
+    g.drawRoundedRectangle (bounds.reduced (0.25f), cornerR, 0.5f);
 
     // Accent stripe at top — clipped to panel bounds
     {
         g.saveState();
         g.reduceClipRegion (bounds.toNearestIntEdges());
-        g.setColour (isVrc6() ? Colors::orangeAccent : Colors::accentActive);
-        g.fillRect (bounds.withHeight (3.0f));
+        auto accentColour = isVrc6() ? Colors::orangeAccent : Colors::accentActive;
+        g.setColour (accentColour);
+        g.fillRect (bounds.withHeight (2.0f));
+        // Subtle glow below accent
+        g.setColour (accentColour.withAlpha (0.08f));
+        g.fillRect (bounds.withHeight (12.0f));
         g.restoreState();
     }
 
