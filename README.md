@@ -22,16 +22,36 @@ Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 Kona
 - **Portamento** — enable/disable with adjustable glide time
 - **Velocity-to-filter** modulation
 
+### Step Sequencer
+- **16-step per-channel sequencer** — FamiTracker-style instrument macros
+- **3 lanes** — Volume (0–15), Pitch (-12 to +12 semitones), Duty cycle
+- **Per-channel** — each of the 8 Classic channels has independent sequence data
+- **Modern engine support** — channel 0 sequencer drives global polyphonic engine
+- **Loop mode** — per-lane loop toggle; non-looping sequences hold last value
+- **Tempo sync** — syncs to host BPM with 9 division options (1/1 through 1/16T)
+- **Triggers on note-on** — sequences reset and play from step 0 on each new note
+- **Interactive grid UI** — click/drag to draw, right-click to reset, beat group markers
+- **Serialized in presets** — step data saved/loaded alongside APVTS state
+
+### VGM Import
+- **Import .vgm/.vgz files** — extract instrument envelopes from Video Game Music files
+- **NES APU register analysis** — tracks per-channel volume, pitch, and duty cycle changes
+- **Automatic instrument extraction** — detects note boundaries, captures attack envelopes
+- **Deduplication** — skips identical instruments, auto-names by character (Lead, Slide, Morph)
+- **GD3 tag parsing** — uses game/track name for preset naming
+- **One preset per instrument** — saved with embedded step sequence data, categorized as "VGM: GameName"
+
 ### MIDI
 - **4 modes** — Split (fixed channel routing), Auto (round-robin polyphony across all enabled channels), Mono (single voice), Layer (all enabled channels play every note)
-- **Layer mode** — thick chiptune stacks: every enabled channel fires on each keypress with its own timbre (e.g. P1 + P2 + Tri + Noise + DPCM + VRC6 Saw)
+- **Layer mode** — thick chiptune stacks: every enabled channel fires on each keypress with its own timbre
 - **Split mode routing** — Ch1→Pulse 1, Ch2→Pulse 2, Ch3→Triangle, Ch10→Noise, Ch4→DPCM, Ch5→VRC6 P1, Ch6→VRC6 P2, Ch7→VRC6 Saw
 - **MIDI Learn** — right-click any custom CC knob → "Learn" → send a CC to auto-assign
+- **MPE support** — per-voice pitch bend, slide, and pressure in Modern engine
 - **Pitch bend** — configurable range (1–24 semitones)
 - **Mod wheel (CC1)** — vibrato depth
 - **Sustain pedal (CC64)** — hold notes
 - **Expression (CC11)** — master volume
-- **Custom CC mappings** — 4 user-configurable slots, each mapping any CC to one of 15 targets (channel volumes, filter cutoff/resonance, chorus/delay/reverb mix, LFO rate, vibrato/tremolo depth)
+- **Custom CC mappings** — 4 user-configurable slots, each mapping any CC to one of 15 targets
 - **Hardcoded CCs** — CC71 (filter resonance), CC74 (filter cutoff), CC91 (reverb mix), CC93 (chorus mix)
 
 ### Effects
@@ -43,9 +63,9 @@ Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 Kona
 
 ### Modulation
 - **LFO** — vibrato (pitch) and tremolo (amplitude) with adjustable rate and depth
-- **Arpeggiator** — Up, Down, Up/Down, Random patterns with rate, octave range, and gate control (with optional DAW tempo sync)
+- **Arpeggiator** — Up, Down, Up/Down, Random, As Played patterns with rate, octave range, and gate control (with optional DAW tempo sync)
 - **Portamento** — enable/disable with adjustable glide time
-- **Tempo sync** — arp rate and delay time can lock to DAW BPM using note divisions (1/1 through 1/32, including triplets)
+- **Tempo sync** — arp rate, delay time, and step sequencer rate can lock to DAW BPM
 
 ### Tuning
 - **4 temperaments** — Equal, Just, Pythagorean, Meantone
@@ -56,15 +76,18 @@ Chiptune synthesizer plugin emulating the Ricoh 2A03 APU with optional VRC6 Kona
 ### Presets
 - **36 factory presets** — leads, bass, drums, FX, VRC6, arps, pads, and Modern engine presets
 - **User presets** — save, delete, import (.cartpreset), export, bank import (.cartbank)
+- **VGM import** — drag in .vgm/.vgz files to extract NES instrument envelopes as presets
 - **A/B comparison** — toggle between two parameter snapshots
 - **Engine-aware browsing** — preset list filters by Classic/Modern mode
 
 ### UI
-- **Waveform display** — real-time oscilloscope with "CARTRIDGE" launch animation
-- **Horizontal slider controls** — effects and modulation panels use slider layout
-- **Channel activity LEDs** — per-channel note indicators
+- **Waveform display** — real-time oscilloscope with glow effect and launch animation
+- **Live status bar** — active voice count, engine mode, MIDI mode, octave, velocity, sustain indicator
+- **Channel activity LEDs** — per-channel note indicators with glow
+- **FX & Mod bars** — accordion-style panels, mutually exclusive expansion
 - **Tooltips** — hover any control for a description
-- **Resizable** — 75%, 100%, 125%, 150% scaling
+- **Resizable** — 100%, 125%, 150%, 200% scaling with auto-detect on first launch
+- **Fullscreen support** — content fills screen, macOS native fullscreen via green button
 - **QWERTY-to-MIDI keyboard** — built-in on-screen keyboard with velocity control
 - **Hold/latch mode** — notes sustain until toggled off
 
@@ -113,10 +136,11 @@ src/
 │   ├── effects/       Bitcrush, Filter, Chorus, Delay, Reverb
 │   ├── mixing/        Nonlinear DAC mixer with per-channel stereo panning
 │   └── modern/        Modern polyphonic engine (dual osc, ADSR, unison)
+├── import/            VGM/VGZ parser, instrument extractor, preset generator
 ├── midi/              Voice managers (Classic split/auto/mono/layer, Modern poly),
 │                      Arpeggiator, Tuning tables, CC routing, MIDI Learn
 └── ui/                Top bar, Channel strips, Effects/Modulation bars,
-                       Modern panel, Waveform display, Status bar
+                       Step sequencer grid, Modern panel, Waveform display, Status bar
 ```
 
 ## License
