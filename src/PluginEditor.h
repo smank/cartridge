@@ -10,6 +10,7 @@
 #include "ui/ModernPanelComponent.h"
 #include "ui/WaveformDisplay.h"
 #include "ui/Colors.h"
+#include "ui/CartridgeLookAndFeel.h"
 #include "ui/FullscreenHelper.h"
 
 class CartridgeEditor : public juce::AudioProcessorEditor
@@ -25,6 +26,8 @@ public:
 
 private:
     [[maybe_unused]] CartridgeProcessor& processorRef;
+
+    cart::ui::CartridgeLookAndFeel lookAndFeel;
 
     cart::TopBarComponent topBar;
     cart::WaveformDisplay waveformDisplay;

@@ -15,6 +15,8 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
       statusBar (p),
       keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
+    setLookAndFeel (&lookAndFeel);
+
     // Wire up VRC6 toggle from top bar to channel strip area
     topBar.onVrc6Toggle = [this] (bool visible)
     {
@@ -208,7 +210,10 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     });
 }
 
-CartridgeEditor::~CartridgeEditor() = default;
+CartridgeEditor::~CartridgeEditor()
+{
+    setLookAndFeel (nullptr);
+}
 
 juce::File CartridgeEditor::getSettingsFile() const
 {
