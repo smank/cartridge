@@ -53,7 +53,10 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
     : channelType (type)
 {
     auto nameColour = isVrc6() ? Colors::orangeAccent : Colors::accentActive;
-    styleLabel (nameLabel, getChannelName (type), 14.0f, nameColour);
+    nameLabel.setText (getChannelName (type), juce::dontSendNotification);
+    nameLabel.setFont (cart::ui::displayFont (13.0f));
+    nameLabel.setColour (juce::Label::textColourId, nameColour);
+    nameLabel.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (nameLabel);
 
     // Pan knob — every channel has one
@@ -456,27 +459,43 @@ void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeS
 
 void ChannelStripComponent::paint (juce::Graphics& g)
 {
+    using namespace cart::ui;
     auto bounds = getLocalBounds().toFloat().reduced (1.0f);
-    const float cornerR = 4.0f;
+    const float cornerR = 5.0f;
 
-    // Rounded background
-    g.setColour (Colors::bgStrip);
+    // Strip body — vertical gradient (top lighter so the accent stripe
+    // melts into the body instead of sitting on top of a flat panel)
+    juce::ColourGradient bodyGrad (
+        Palette::surfaceAlt.brighter (0.05f), 0.0f, bounds.getY(),
+        Palette::surfaceAlt.darker (0.10f),   0.0f, bounds.getBottom(),
+        false);
+    g.setGradientFill (bodyGrad);
     g.fillRoundedRectangle (bounds, cornerR);
 
-    // Subtle outline
-    g.setColour (Colors::divider.withAlpha (0.4f));
-    g.drawRoundedRectangle (bounds.reduced (0.25f), cornerR, 0.5f);
+    // Outline — slightly stronger when activity LED is lit
+    g.setColour (ledState
+                    ? (isVrc6() ? Palette::vrc6Accent.withAlpha (0.55f)
+                                : Palette::primary.withAlpha (0.55f))
+                    : Palette::outlineDim.withAlpha (0.5f));
+    g.drawRoundedRectangle (bounds.reduced (0.25f), cornerR, 0.8f);
 
-    // Accent stripe at top — clipped to panel bounds
+    // Accent stripe at top — gradient fade from full accent down
     {
         g.saveState();
         g.reduceClipRegion (bounds.toNearestIntEdges());
-        auto accentColour = isVrc6() ? Colors::orangeAccent : Colors::accentActive;
-        g.setColour (accentColour);
+        const auto accentColour = isVrc6() ? Palette::vrc6Accent : Palette::primary;
+        // Stronger when active
+        const float baseAlpha = ledState ? 1.0f : 0.85f;
+        g.setColour (accentColour.withAlpha (baseAlpha));
         g.fillRect (bounds.withHeight (2.0f));
-        // Subtle glow below accent
-        g.setColour (accentColour.withAlpha (0.08f));
-        g.fillRect (bounds.withHeight (12.0f));
+        // Soft glow trailing down
+        juce::ColourGradient glow (accentColour.withAlpha (ledState ? 0.22f : 0.10f),
+                                   bounds.getCentreX(), bounds.getY(),
+                                   accentColour.withAlpha (0.0f),
+                                   bounds.getCentreX(), bounds.getY() + 18.0f,
+                                   false);
+        g.setGradientFill (glow);
+        g.fillRect (bounds.withHeight (18.0f));
         g.restoreState();
     }
 

@@ -284,7 +284,21 @@ void CartridgeEditor::saveScalePreference()
 
 void CartridgeEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (cart::Colors::bgDark);
+    using namespace cart::ui;
+    auto bounds = getLocalBounds().toFloat();
+
+    // Subtle vertical gradient — slightly lighter at the top so the
+    // top bar feels like a "control surface" and the keyboard reads
+    // as a foot rest rather than identical-flat.
+    g.setGradientFill (juce::ColourGradient (
+        Palette::background.brighter (0.04f), 0.0f, 0.0f,
+        Palette::background.darker (0.10f),  0.0f, bounds.getHeight(),
+        false));
+    g.fillRect (bounds);
+
+    // Hairline divider under the top bar
+    g.setColour (Palette::primary.withAlpha (0.35f));
+    g.fillRect (0, topBarHeight - 1, getWidth(), 1);
 }
 
 void CartridgeEditor::resized()

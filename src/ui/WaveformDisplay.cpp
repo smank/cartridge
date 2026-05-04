@@ -23,20 +23,26 @@ void WaveformDisplay::timerCallback()
 
 void WaveformDisplay::paint (juce::Graphics& g)
 {
+    using namespace cart::ui;
     auto bounds = getLocalBounds().toFloat();
 
-    // Background with subtle inset
-    g.setColour (Colors::bgDark);
-    g.fillRoundedRectangle (bounds, 3.0f);
+    // Inset scope panel — radial gradient gives it depth like an oscilloscope tube
+    juce::ColourGradient bgGrad (
+        Palette::background.brighter (0.10f),
+        bounds.getCentreX(), bounds.getCentreY(),
+        Palette::background.darker (0.30f),
+        bounds.getRight(), bounds.getBottom(),
+        true);
+    g.setGradientFill (bgGrad);
+    g.fillRoundedRectangle (bounds, 4.0f);
 
-    // Border — thin accent line at bottom for visual weight
-    g.setColour (Colors::divider.withAlpha (0.4f));
-    g.drawRoundedRectangle (bounds.reduced (0.5f), 3.0f, 0.5f);
+    // Faint outline
+    g.setColour (Palette::outlineDim.withAlpha (0.6f));
+    g.drawRoundedRectangle (bounds.reduced (0.5f), 4.0f, 0.8f);
 
     if (bounds.getWidth() < 2.0f || bounds.getHeight() < 2.0f)
         return;
 
-    // Compute intro waveform on first paint (needs valid bounds)
     if (!introComputed)
         computeIntroWaveform();
 
@@ -47,60 +53,64 @@ void WaveformDisplay::paint (juce::Graphics& g)
     float midY = bounds.getCentreY();
     float halfH = bounds.getHeight() * 0.45f;
 
-    // Draw centre line
-    g.setColour (Colors::textDark.withAlpha (0.2f));
-    g.fillRect (bounds.getX() + 4.0f, midY, bounds.getWidth() - 8.0f, 1.0f);
+    // ─── Grid: centre line + ±50% rails ───────────────────────────────
+    const float gridX0 = bounds.getX() + 4.0f;
+    const float gridX1 = bounds.getRight() - 4.0f;
+    g.setColour (Palette::outline.withAlpha (0.20f));
+    g.fillRect (gridX0, midY, gridX1 - gridX0, 1.0f);
+    g.setColour (Palette::outline.withAlpha (0.10f));
+    g.fillRect (gridX0, midY - halfH * 0.5f, gridX1 - gridX0, 1.0f);
+    g.fillRect (gridX0, midY + halfH * 0.5f, gridX1 - gridX0, 1.0f);
 
-    // Compute animation blend: 1.0 = full intro, 0.0 = full live
+    // Vertical reticule ticks every ~64px
+    const float vReticuleStep = 64.0f;
+    g.setColour (Palette::outline.withAlpha (0.10f));
+    for (float vx = gridX0 + vReticuleStep; vx < gridX1; vx += vReticuleStep)
+        g.fillRect (vx, bounds.getY() + 4.0f, 1.0f, bounds.getHeight() - 8.0f);
+
+    // ─── Animation blend ───────────────────────────────────────────────
     float introAlpha = 0.0f;
     if (introFramesLeft > 0)
     {
         if (introFramesLeft > 60)
-            introAlpha = 1.0f;   // First 1 second: full intro
+            introAlpha = 1.0f;
         else
-            introAlpha = static_cast<float> (introFramesLeft) / 60.0f;  // Fade over 2 seconds
+            introAlpha = static_cast<float> (introFramesLeft) / 60.0f;
     }
 
-    // Build the displayed waveform (blend intro and live)
+    // ─── Waveform path ─────────────────────────────────────────────────
     juce::Path path;
     bool started = false;
-
     for (int i = 0; i < numSamples; ++i)
     {
         float liveSample = displayBuffer[static_cast<size_t> (i)];
         float introSample = (i < static_cast<int> (introWaveform.size()))
             ? introWaveform[static_cast<size_t> (i)]
             : 0.0f;
-
         float sample = introAlpha * introSample + (1.0f - introAlpha) * liveSample;
 
         float x = bounds.getX() + static_cast<float> (i);
         float y = midY - sample * halfH;
         y = juce::jlimit (bounds.getY(), bounds.getBottom(), y);
 
-        if (!started)
-        {
-            path.startNewSubPath (x, y);
-            started = true;
-        }
-        else
-        {
-            path.lineTo (x, y);
-        }
+        if (!started) { path.startNewSubPath (x, y); started = true; }
+        else          { path.lineTo (x, y); }
     }
 
-    // Draw waveform with glow effect
-    g.setColour (Colors::accentActive.withAlpha (0.15f));
-    g.strokePath (path, juce::PathStrokeType (3.5f));
-    g.setColour (Colors::accentActive);
-    g.strokePath (path, juce::PathStrokeType (1.5f));
+    // ─── Multi-pass glow + crisp core ─────────────────────────────────
+    g.setColour (Palette::primary.withAlpha (0.10f));
+    g.strokePath (path, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved));
+    g.setColour (Palette::primary.withAlpha (0.25f));
+    g.strokePath (path, juce::PathStrokeType (2.8f, juce::PathStrokeType::curved));
+    g.setColour (Palette::hot);
+    g.strokePath (path, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved));
 
     // Subtle watermark
     if (introAlpha < 1.0f)
     {
-        float watermarkAlpha = (1.0f - introAlpha) * 0.06f;
-        g.setColour (Colors::textDark.withAlpha (watermarkAlpha));
-        g.setFont (juce::FontOptions (bounds.getHeight() * 0.30f));
+        float watermarkAlpha = (1.0f - introAlpha) * 0.05f;
+        g.setColour (Palette::textDim.withAlpha (watermarkAlpha));
+        g.setFont (displayFont (bounds.getHeight() * 0.30f));
         g.drawText ("CARTRIDGE", bounds.toNearestInt(), juce::Justification::centred);
     }
 }

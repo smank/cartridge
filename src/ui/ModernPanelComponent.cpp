@@ -149,8 +149,8 @@ void ModernPanelComponent::makeLabel (juce::Label& label, const juce::String& te
 
 void ModernPanelComponent::paint (juce::Graphics& g)
 {
-    g.setColour (Colors::bgDark);
-    g.fillRect (getLocalBounds());
+    using namespace cart::ui;
+    // Panel background painted by editor's gradient — leave transparent.
 
     auto bounds = getLocalBounds().reduced (8, 4);
     const int sectionGap = 4;
@@ -170,22 +170,49 @@ void ModernPanelComponent::paint (juce::Graphics& g)
             (float) bounds.getWidth(),
             (float) sectionH);
 
-        // Panel background + outline
-        g.setColour (Colors::bgStrip);
+        // Panel body — vertical gradient for depth
+        juce::ColourGradient bodyGrad (
+            Palette::surfaceAlt.brighter (0.05f), 0.0f, sb.getY(),
+            Palette::surface.darker (0.10f),      0.0f, sb.getBottom(),
+            false);
+        g.setGradientFill (bodyGrad);
         g.fillRoundedRectangle (sb, cornerR);
-        g.setColour (Colors::divider);
-        g.drawRoundedRectangle (sb, cornerR, 0.5f);
 
-        // Accent stripe — clipped
+        g.setColour (Palette::outlineDim.withAlpha (0.7f));
+        g.drawRoundedRectangle (sb.reduced (0.25f), cornerR, 0.8f);
+
+        // Accent stripe with horizontal gradient + soft glow trailing down
         {
             g.saveState();
             g.reduceClipRegion (sb.toNearestIntEdges());
-            g.setColour (Colors::accentActive);
+
+            juce::ColourGradient stripeGrad (
+                Palette::primary,         sb.getX(),     sb.getY(),
+                Palette::primary.withAlpha (0.55f), sb.getRight(), sb.getY(),
+                false);
+            g.setGradientFill (stripeGrad);
             g.fillRect (sb.withHeight ((float) accentH));
+
+            // Diagonal hairlines on the right — smank signature
+            g.setColour (Palette::primary.withAlpha (0.35f));
+            const float dx0 = sb.getRight() - 28.0f;
+            const float dy0 = sb.getY() + (float) accentH + 2.0f;
+            const float dy1 = sb.getY() + (float) accentH + (float) headerH;
+            g.drawLine (dx0,         dy0, dx0 + 16.0f, dy1, 1.0f);
+            g.drawLine (dx0 + 6.0f,  dy0, dx0 + 22.0f, dy1, 1.0f);
+
+            // Soft accent glow under the stripe
+            juce::ColourGradient glow (
+                Palette::primary.withAlpha (0.12f), sb.getCentreX(), sb.getY(),
+                Palette::primary.withAlpha (0.0f),  sb.getCentreX(), sb.getY() + 14.0f,
+                false);
+            g.setGradientFill (glow);
+            g.fillRect (sb.withHeight (14.0f));
+
             g.restoreState();
         }
 
-        // Header text below accent — must match resized() headerArea
+        // Header text
         float labelY = sb.getY() + (float) accentH + 2.0f;
         float p = (float) pad;
 
@@ -193,8 +220,8 @@ void ModernPanelComponent::paint (juce::Graphics& g)
         {
             float divX = sb.getX() + std::floor (sb.getWidth() * 0.5f);
 
-            g.setColour (Colors::textPrimary);
-            g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+            g.setColour (Palette::textPrimary);
+            g.setFont (displayFont (12.0f));
             g.drawText ("OSC A",
                         juce::Rectangle<float> (sb.getX() + p, labelY, divX - sb.getX() - p, (float) headerH),
                         juce::Justification::centredLeft);
@@ -202,15 +229,15 @@ void ModernPanelComponent::paint (juce::Graphics& g)
                         juce::Rectangle<float> (divX + p, labelY, sb.getRight() - divX - p, (float) headerH),
                         juce::Justification::centredLeft);
 
-            g.setColour (Colors::divider);
+            g.setColour (Palette::outlineDim);
             g.drawVerticalLine ((int) divX,
                                 sb.getY() + (float) accentH + 2.0f,
                                 sb.getBottom() - 4.0f);
         }
         else
         {
-            g.setColour (Colors::textPrimary);
-            g.setFont (juce::FontOptions (12.0f).withStyle ("Bold"));
+            g.setColour (Palette::textPrimary);
+            g.setFont (displayFont (12.0f));
             g.drawText (sectionNames[i],
                         juce::Rectangle<float> (sb.getX() + p, labelY, sb.getWidth() - 2.0f * p, (float) headerH),
                         juce::Justification::centredLeft);

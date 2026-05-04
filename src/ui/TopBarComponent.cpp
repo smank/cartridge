@@ -575,22 +575,36 @@ void TopBarComponent::mouseDoubleClick (const juce::MouseEvent&)
 
 void TopBarComponent::paint (juce::Graphics& g)
 {
-    // Subtle gradient background
+    using namespace cart::ui;
     auto bounds = getLocalBounds().toFloat();
+
+    // Two-tone vertical gradient — slightly lighter at top for the
+    // "control surface" feel. Endpoints clamp the contrast so the bar
+    // doesn't read as a separate component shoved above the editor.
     g.setGradientFill (juce::ColourGradient (
-        Colors::bgMid, 0.0f, 0.0f,
-        Colors::bgMid.darker (0.15f), 0.0f, bounds.getHeight(),
+        Palette::surface.brighter (0.06f), 0.0f, 0.0f,
+        Palette::surface.darker (0.18f),   0.0f, bounds.getHeight(),
         false));
     g.fillRect (bounds);
 
-    // Row dividers — subtle horizontal lines between rows
-    int rowH = (getHeight() - 6) / 3;
-    g.setColour (Colors::divider.withAlpha (0.3f));
-    g.fillRect (8, 3 + rowH, getWidth() - 16, 1);
-    g.fillRect (8, 3 + rowH * 2, getWidth() - 16, 1);
+    // Top hairline — bone-cream secondary, very subtle
+    g.setColour (Palette::secondary.withAlpha (0.06f));
+    g.fillRect (0.0f, 0.0f, bounds.getWidth(), 1.0f);
 
-    // Bottom edge
-    g.setColour (Colors::accentActive.withAlpha (0.4f));
+    // Row dividers — slightly stronger than before with primary tint
+    int rowH = (getHeight() - 6) / 3;
+    g.setColour (Palette::outlineDim.withAlpha (0.45f));
+    g.fillRect (12, 3 + rowH,     getWidth() - 24, 1);
+    g.fillRect (12, 3 + rowH * 2, getWidth() - 24, 1);
+
+    // Bottom edge — primary accent with horizontal gradient (bright in
+    // the middle, fading at the ends) so the divider feels intentional
+    juce::ColourGradient bottomGlow (
+        Palette::primary.withAlpha (0.0f),  0.0f, 0.0f,
+        Palette::primary.withAlpha (0.65f), bounds.getCentreX(), 0.0f,
+        false);
+    bottomGlow.addColour (1.0, Palette::primary.withAlpha (0.0f));
+    g.setGradientFill (bottomGlow);
     g.fillRect (0, getHeight() - 1, getWidth(), 1);
 }
 

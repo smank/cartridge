@@ -41,12 +41,18 @@ void StatusBarComponent::resized()
 
 void StatusBarComponent::paint (juce::Graphics& g)
 {
+    using namespace cart::ui;
     auto area = getLocalBounds();
 
-    g.setColour (Colors::bgDark);
+    // Subtle vertical gradient — slightly darker than the editor body
+    g.setGradientFill (juce::ColourGradient (
+        Palette::background.darker (0.05f), 0.0f, (float) area.getY(),
+        Palette::background.darker (0.20f), 0.0f, (float) area.getBottom(),
+        false));
     g.fillRect (area);
 
-    g.setColour (Colors::divider.withAlpha (0.5f));
+    // Hairline divider with primary tint at top
+    g.setColour (Palette::primary.withAlpha (0.35f));
     g.fillRect (area.removeFromTop (1));
 
     auto font = juce::Font (juce::FontOptions (12.0f));

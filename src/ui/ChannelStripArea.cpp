@@ -52,10 +52,9 @@ void ChannelStripArea::setVrc6Visible (bool visible)
 
 void ChannelStripArea::paint (juce::Graphics& g)
 {
-    g.setColour (Colors::bgDark);
-    g.fillRect (getLocalBounds());
+    // Background is painted by the editor's gradient — leave transparent.
 
-    // Draw VRC6 divider if visible
+    // VRC6 divider: gradient stripe between APU and Konami sections
     if (vrc6Visible)
     {
         int numApu = 5;
@@ -63,8 +62,15 @@ void ChannelStripArea::paint (juce::Graphics& g)
         int stripW = getWidth() / numTotal;
         int dividerX = numApu * stripW;
 
-        g.setColour (Colors::vrc6Divider);
-        g.fillRect (dividerX - 1, 4, 2, getHeight() - 8);
+        // Wider, softer gradient — fades out top and bottom
+        const auto accent = cart::ui::Palette::vrc6Accent;
+        juce::ColourGradient grad (accent.withAlpha (0.0f), (float) dividerX, 0.0f,
+                                   accent.withAlpha (0.0f), (float) dividerX, (float) getHeight(),
+                                   false);
+        grad.addColour (0.15, accent.withAlpha (0.85f));
+        grad.addColour (0.85, accent.withAlpha (0.85f));
+        g.setGradientFill (grad);
+        g.fillRect (dividerX - 1, 0, 2, getHeight());
     }
 }
 
