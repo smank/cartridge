@@ -603,15 +603,18 @@ void TopBarComponent::resized()
     // ─── Row 1: Preset navigation + actions ─────────────────────────────
     auto row1 = bounds.removeFromTop (rowH).reduced (0, 2);
 
-    prevButton.setBounds (row1.removeFromLeft (26));
+    // Prev/Next/AB normalised to 36px hit targets so navigation feels
+    // deliberate at every scale factor (no thumb mis-clicks).
+    constexpr int navBtnW = 36;
+    prevButton.setBounds (row1.removeFromLeft (navBtnW));
     row1.removeFromLeft (2);
-    nextButton.setBounds (row1.removeFromLeft (26));
+    nextButton.setBounds (row1.removeFromLeft (navBtnW));
     row1.removeFromLeft (gap);
 
     // A/B button on far right
-    abButton.setBounds (row1.removeFromRight (32));
+    abButton.setBounds (row1.removeFromRight (navBtnW));
     row1.removeFromRight (gap);
-    panicButton.setBounds (row1.removeFromRight (36));
+    panicButton.setBounds (row1.removeFromRight (navBtnW));
     row1.removeFromRight (gap);
 
     // Preset dropdown — takes generous space
