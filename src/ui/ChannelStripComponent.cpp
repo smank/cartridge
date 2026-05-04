@@ -5,47 +5,21 @@ namespace cart {
 
 namespace
 {
+    // All sliders in a strip share the same style — the LookAndFeel handles
+    // colours via Palette so we don't override here.
     void styleKnob (juce::Slider& knob)
     {
         knob.setSliderStyle (juce::Slider::LinearHorizontal);
         knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 36, 14);
-        knob.setColour (juce::Slider::trackColourId, Colors::faderTrack);
-        knob.setColour (juce::Slider::thumbColourId, Colors::faderThumb);
-        knob.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
-        knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
-        knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
         knob.setPopupMenuEnabled (true);
     }
 
-    void styleDetailKnob (juce::Slider& knob)
-    {
-        knob.setSliderStyle (juce::Slider::LinearHorizontal);
-        knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 36, 14);
-        knob.setColour (juce::Slider::trackColourId, Colors::faderTrack);
-        knob.setColour (juce::Slider::thumbColourId, Colors::faderThumb);
-        knob.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
-        knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
-        knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-        knob.setPopupMenuEnabled (true);
-    }
-
-    void styleFader (juce::Slider& fader)
-    {
-        fader.setSliderStyle (juce::Slider::LinearHorizontal);
-        fader.setTextBoxStyle (juce::Slider::TextBoxRight, false, 36, 14);
-        fader.setColour (juce::Slider::trackColourId, Colors::faderTrack);
-        fader.setColour (juce::Slider::thumbColourId, Colors::faderThumb);
-        fader.setColour (juce::Slider::backgroundColourId, Colors::bgLight);
-        fader.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
-        fader.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-        fader.setPopupMenuEnabled (true);
-    }
+    void styleDetailKnob (juce::Slider& knob) { styleKnob (knob); }
+    void styleFader      (juce::Slider& fader) { styleKnob (fader); }
 
     void styleToggle (juce::ToggleButton& toggle, const juce::String& text)
     {
         toggle.setButtonText (text);
-        toggle.setColour (juce::ToggleButton::textColourId, Colors::textSecondary);
-        toggle.setColour (juce::ToggleButton::tickColourId, Colors::accentActive);
     }
 
     void styleLabel (juce::Label& label, const juce::String& text, float fontSize,

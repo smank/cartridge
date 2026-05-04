@@ -233,13 +233,11 @@ void ModulationBarComponent::collapseAll()
 
 void ModulationBarComponent::styleKnob (juce::Slider& knob)
 {
-    knob.setSliderStyle (juce::Slider::LinearHorizontal);
-    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 14);
-    knob.setColour (juce::Slider::trackColourId, Colors::accentActive);
-    knob.setColour (juce::Slider::thumbColourId, Colors::accentActive);
-    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline.withAlpha (0.5f));
-    knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
-    knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+    knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.2f,
+                              juce::MathConstants<float>::pi * 2.8f,
+                              true);
+    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 14);
     knob.setPopupMenuEnabled (true);
 }
 
@@ -398,90 +396,101 @@ void ModulationBarComponent::paint (juce::Graphics& g)
 
 void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int modIndex)
 {
-    const int labelW = 56;
-    const int comboH = 20;
+    constexpr int colW   = 84;
+    constexpr int colGap = 8;
+    constexpr int labelH = 14;
+    constexpr int comboH = 22;
 
-    area = area.reduced (10, 6);
+    area = area.reduced (10, 8);
 
-    auto layoutRow = [&] (juce::Rectangle<int>& a, juce::Slider& slider, juce::Label& label, int rowH)
+    auto centreColumns = [&] (int numColumns)
     {
-        auto row = a.removeFromTop (rowH);
-        label.setJustificationType (juce::Justification::centredRight);
-        label.setBounds (row.removeFromLeft (labelW));
-        row.removeFromLeft (6);
-        slider.setBounds (row);
+        const int needed = numColumns * colW + (numColumns - 1) * colGap;
+        const int offset = juce::jmax (0, (area.getWidth() - needed) / 2);
+        area.removeFromLeft (offset);
+    };
+
+    auto layoutKnobCol = [&] (juce::Slider& slider, juce::Label& label)
+    {
+        auto col = area.removeFromLeft (colW);
+        label.setJustificationType (juce::Justification::centred);
+        label.setBounds (col.removeFromTop (labelH));
+        slider.setBounds (col);
+        if (area.getWidth() > 0) area.removeFromLeft (colGap);
+    };
+
+    auto layoutComboCol = [&] (juce::ComboBox& combo, juce::Label& label)
+    {
+        auto col = area.removeFromLeft (colW);
+        label.setJustificationType (juce::Justification::centred);
+        label.setBounds (col.removeFromTop (labelH));
+        col.removeFromTop ((col.getHeight() - comboH) / 2);
+        combo.setBounds (col.removeFromTop (comboH));
+        if (area.getWidth() > 0) area.removeFromLeft (colGap);
     };
 
     switch (modIndex)
     {
         case MOD_LFO:
-        {
-            int rowH = area.getHeight() / 3;
-            layoutRow (area, lfoRate, lfoRateLabel, rowH);
-            layoutRow (area, lfoVibrato, lfoVibratoLabel, rowH);
-            layoutRow (area, lfoTremolo, lfoTremoloLabel, area.getHeight());
+            centreColumns (3);
+            layoutKnobCol (lfoRate,    lfoRateLabel);
+            layoutKnobCol (lfoVibrato, lfoVibratoLabel);
+            layoutKnobCol (lfoTremolo, lfoTremoloLabel);
             break;
-        }
         case MOD_PORTA:
-        {
-            auto centred = area.withHeight (juce::jmin (24, area.getHeight()));
-            centred.setCentre (area.getCentreX(), area.getCentreY());
-            portaTimeLabel.setJustificationType (juce::Justification::centredRight);
-            portaTimeLabel.setBounds (centred.removeFromLeft (labelW));
-            centred.removeFromLeft (6);
-            portaTime.setBounds (centred);
+            centreColumns (1);
+            layoutKnobCol (portaTime, portaTimeLabel);
             break;
-        }
         case MOD_ARP:
         {
-            int rowH = area.getHeight() / 5;
+            // Pattern combo + 3 knobs + sync column
+            centreColumns (5);
+            layoutComboCol (arpPattern, arpPatternLabel);
+            layoutKnobCol  (arpRate,    arpRateLabel);
+            layoutKnobCol  (arpOctaves, arpOctavesLabel);
+            layoutKnobCol  (arpGate,    arpGateLabel);
 
-            auto comboRow = area.removeFromTop (rowH);
-            arpPatternLabel.setJustificationType (juce::Justification::centredRight);
-            arpPatternLabel.setBounds (comboRow.removeFromLeft (labelW));
-            comboRow.removeFromLeft (6);
-            arpPattern.setBounds (comboRow.removeFromLeft (juce::jmin (90, comboRow.getWidth())));
-
-            layoutRow (area, arpRate, arpRateLabel, rowH);
-            layoutRow (area, arpOctaves, arpOctavesLabel, rowH);
-            layoutRow (area, arpGate, arpGateLabel, rowH);
-
-            // Sync row — aligned with label column
-            auto syncRow = area;
-            syncRow.removeFromLeft (labelW + 6);
-            arpSyncToggle.setBounds (syncRow.removeFromLeft (52));
-            syncRow.removeFromLeft (4);
-            arpSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (75, syncRow.getWidth()))
-                                       .withHeight (comboH));
+            auto syncCol = area.removeFromLeft (colW);
+            syncCol.removeFromTop (labelH + 4);
+            arpSyncToggle.setBounds (syncCol.removeFromTop (24));
+            syncCol.removeFromTop (4);
+            arpSyncDiv.setBounds (syncCol.removeFromTop (comboH));
             break;
         }
         case MOD_DPCM:
         {
-            auto centred = area.withSizeKeepingCentre (area.getWidth() / 2, area.getHeight());
+            // Sample combo + Load button column
+            centreColumns (1);
+            auto col = area.removeFromLeft (colW * 2 + colGap);
             dpcmSampleLabel.setJustificationType (juce::Justification::centred);
-            dpcmSampleLabel.setBounds (centred.removeFromTop (14));
-            centred.removeFromTop (2);
-            auto row = centred.removeFromTop (comboH + 2);
-            int cw = juce::jmax (80, row.getWidth() - 56);
-            dpcmSample.setBounds (row.removeFromLeft (cw));
-            row.removeFromLeft (4);
-            dpcmLoadButton.setBounds (row.removeFromLeft (46).withHeight (comboH));
+            dpcmSampleLabel.setBounds (col.removeFromTop (labelH));
+            col.removeFromTop ((col.getHeight() - comboH) / 2);
+            auto row = col.removeFromTop (comboH);
+            dpcmLoadButton.setBounds (row.removeFromRight (60));
+            row.removeFromRight (8);
+            dpcmSample.setBounds (row);
             break;
         }
         case MOD_SEQ:
         {
-            auto ctrlRow = area.removeFromTop (24);
-            seqRateLabel.setJustificationType (juce::Justification::centredRight);
-            seqRateLabel.setBounds (ctrlRow.removeFromLeft (labelW));
-            ctrlRow.removeFromLeft (6);
-            seqRate.setBounds (ctrlRow.removeFromLeft (juce::jmin (180, ctrlRow.getWidth())));
-            ctrlRow.removeFromLeft (8);
-            seqSyncToggle.setBounds (ctrlRow.removeFromLeft (52));
-            ctrlRow.removeFromLeft (4);
-            seqSyncDiv.setBounds (ctrlRow.removeFromLeft (juce::jmin (75, ctrlRow.getWidth()))
-                                        .withHeight (juce::jmin (comboH, ctrlRow.getHeight())));
+            // Top row: Rate knob, sync column on the left; step grid below fills the rest
+            auto topRow = area.removeFromTop (labelH + 50);
 
-            // Step grid fills remaining space
+            // Rate knob column on the left
+            auto rateCol = topRow.removeFromLeft (colW);
+            seqRateLabel.setJustificationType (juce::Justification::centred);
+            seqRateLabel.setBounds (rateCol.removeFromTop (labelH));
+            seqRate.setBounds (rateCol);
+            topRow.removeFromLeft (colGap);
+
+            // Sync toggle + combo as a stacked column
+            auto syncCol = topRow.removeFromLeft (colW);
+            syncCol.removeFromTop (labelH + 4);
+            seqSyncToggle.setBounds (syncCol.removeFromTop (22));
+            syncCol.removeFromTop (4);
+            seqSyncDiv.setBounds (syncCol.removeFromTop (comboH));
+
+            // Step grid takes the rest
             area.removeFromTop (4);
             stepSeqGrid->setBounds (area);
             break;

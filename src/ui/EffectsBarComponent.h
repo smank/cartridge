@@ -24,7 +24,7 @@ public:
     std::function<void()> onHeightChanged;
 
     static constexpr int headerHeight = 32;
-    static constexpr int detailHeight = 100;
+    static constexpr int detailHeight = 120;
 
 private:
     enum EffectIndex { FX_CRUSH = 0, FX_FILTER, FX_CHORUS, FX_DELAY, FX_REVERB, NUM_FX };

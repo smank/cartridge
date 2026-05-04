@@ -235,13 +235,11 @@ void EffectsBarComponent::collapseAll()
 
 void EffectsBarComponent::styleKnob (juce::Slider& knob)
 {
-    knob.setSliderStyle (juce::Slider::LinearHorizontal);
-    knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 44, 14);
-    knob.setColour (juce::Slider::trackColourId, Colors::fxAccent);
-    knob.setColour (juce::Slider::thumbColourId, Colors::fxAccent);
-    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline.withAlpha (0.5f));
-    knob.setColour (juce::Slider::textBoxTextColourId, Colors::textSecondary);
-    knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+    knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.2f,
+                              juce::MathConstants<float>::pi * 2.8f,
+                              true);
+    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 64, 14);
     knob.setPopupMenuEnabled (true);
 }
 
@@ -396,80 +394,82 @@ void EffectsBarComponent::paint (juce::Graphics& g)
 
 void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIndex)
 {
-    const int labelW = 56;
-    const int comboH = 20;
+    constexpr int colW   = 84;
+    constexpr int colGap = 8;
+    constexpr int labelH = 14;
+    constexpr int comboH = 22;
 
-    area = area.reduced (10, 6);
+    area = area.reduced (10, 8);
 
-    auto layoutRow = [&] (juce::Rectangle<int>& a, juce::Slider& slider, juce::Label& label, int rowH)
+    // Centre the column row horizontally
+    auto centreColumns = [&] (int numColumns)
     {
-        auto row = a.removeFromTop (rowH);
-        label.setJustificationType (juce::Justification::centredRight);
-        label.setBounds (row.removeFromLeft (labelW));
-        row.removeFromLeft (6);
-        slider.setBounds (row);
+        const int needed = numColumns * colW + (numColumns - 1) * colGap;
+        const int offset = juce::jmax (0, (area.getWidth() - needed) / 2);
+        area.removeFromLeft (offset);
     };
 
-    auto layoutComboRow = [&] (juce::Rectangle<int>& a, juce::ComboBox& combo, juce::Label& label, int rowH)
+    auto layoutKnobCol = [&] (juce::Slider& slider, juce::Label& label)
     {
-        auto row = a.removeFromTop (rowH);
-        label.setJustificationType (juce::Justification::centredRight);
-        label.setBounds (row.removeFromLeft (labelW));
-        row.removeFromLeft (6);
-        combo.setBounds (row.removeFromLeft (juce::jmin (75, row.getWidth())).withHeight (comboH));
+        auto col = area.removeFromLeft (colW);
+        label.setJustificationType (juce::Justification::centred);
+        label.setBounds (col.removeFromTop (labelH));
+        slider.setBounds (col);
+        if (area.getWidth() > 0) area.removeFromLeft (colGap);
+    };
+
+    auto layoutComboCol = [&] (juce::ComboBox& combo, juce::Label& label)
+    {
+        auto col = area.removeFromLeft (colW);
+        label.setJustificationType (juce::Justification::centred);
+        label.setBounds (col.removeFromTop (labelH));
+        col.removeFromTop ((col.getHeight() - comboH) / 2);
+        combo.setBounds (col.removeFromTop (comboH));
+        if (area.getWidth() > 0) area.removeFromLeft (colGap);
     };
 
     switch (fxIndex)
     {
         case FX_CRUSH:
-        {
-            int rowH = area.getHeight() / 3;
-            layoutRow (area, bcBitDepth, bcBitDepthLabel, rowH);
-            layoutRow (area, bcRate, bcRateLabel, rowH);
-            layoutRow (area, bcMix, bcMixLabel, area.getHeight());
+            centreColumns (3);
+            layoutKnobCol (bcBitDepth,   bcBitDepthLabel);
+            layoutKnobCol (bcRate,       bcRateLabel);
+            layoutKnobCol (bcMix,        bcMixLabel);
             break;
-        }
         case FX_FILTER:
-        {
-            int rowH = area.getHeight() / 3;
-            layoutComboRow (area, fltType, fltTypeLabel, rowH);
-            layoutRow (area, fltCutoff, fltCutoffLabel, rowH);
-            layoutRow (area, fltResonance, fltResonanceLabel, area.getHeight());
+            centreColumns (3);
+            layoutComboCol (fltType,    fltTypeLabel);
+            layoutKnobCol  (fltCutoff,  fltCutoffLabel);
+            layoutKnobCol  (fltResonance, fltResonanceLabel);
             break;
-        }
         case FX_CHORUS:
-        {
-            int rowH = area.getHeight() / 3;
-            layoutRow (area, chRate, chRateLabel, rowH);
-            layoutRow (area, chDepth, chDepthLabel, rowH);
-            layoutRow (area, chMix, chMixLabel, area.getHeight());
+            centreColumns (3);
+            layoutKnobCol (chRate,  chRateLabel);
+            layoutKnobCol (chDepth, chDepthLabel);
+            layoutKnobCol (chMix,   chMixLabel);
             break;
-        }
         case FX_DELAY:
         {
-            int rowH = area.getHeight() / 4;
-            layoutRow (area, dlTime, dlTimeLabel, rowH);
-            layoutRow (area, dlFeedback, dlFeedbackLabel, rowH);
-            layoutRow (area, dlMix, dlMixLabel, rowH);
+            // 3 knobs + sync column (toggle stacked over combo)
+            centreColumns (4);
+            layoutKnobCol (dlTime,     dlTimeLabel);
+            layoutKnobCol (dlFeedback, dlFeedbackLabel);
+            layoutKnobCol (dlMix,      dlMixLabel);
 
-            // Sync row — aligned with label column
-            auto syncRow = area;
-            syncRow.removeFromLeft (labelW + 6);
-            dlSyncToggle.setBounds (syncRow.removeFromLeft (52));
-            syncRow.removeFromLeft (4);
-            dlSyncDiv.setBounds (syncRow.removeFromLeft (juce::jmin (75, syncRow.getWidth()))
-                                       .withHeight (comboH));
+            auto syncCol = area.removeFromLeft (colW);
+            syncCol.removeFromTop (labelH + 4);
+            dlSyncToggle.setBounds (syncCol.removeFromTop (24));
+            syncCol.removeFromTop (4);
+            dlSyncDiv.setBounds (syncCol.removeFromTop (comboH));
             break;
         }
         case FX_REVERB:
-        {
-            int rowH = area.getHeight() / 4;
-            layoutRow (area, rvSize, rvSizeLabel, rowH);
-            layoutRow (area, rvDamping, rvDampingLabel, rowH);
-            layoutRow (area, rvWidth, rvWidthLabel, rowH);
-            layoutRow (area, rvMix, rvMixLabel, area.getHeight());
+            centreColumns (4);
+            layoutKnobCol (rvSize,    rvSizeLabel);
+            layoutKnobCol (rvDamping, rvDampingLabel);
+            layoutKnobCol (rvWidth,   rvWidthLabel);
+            layoutKnobCol (rvMix,     rvMixLabel);
             break;
-        }
         default: break;
     }
 }

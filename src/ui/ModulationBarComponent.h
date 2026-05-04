@@ -28,7 +28,7 @@ public:
     std::function<void(const juce::File&)> onDpcmLoad;
 
     static constexpr int headerHeight = 32;
-    static constexpr int detailHeight = 100;
+    static constexpr int detailHeight = 120;
 
 private:
     enum ModIndex { MOD_LFO = 0, MOD_PORTA, MOD_ARP, MOD_DPCM, MOD_SEQ, NUM_MOD };

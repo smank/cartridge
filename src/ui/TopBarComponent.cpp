@@ -201,8 +201,6 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── Master Volume ───────────────────────────────────────────────────
     masterVolSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     masterVolSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    masterVolSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
-    masterVolSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (masterVolSlider);
     masterVolSlider.setPopupDisplayEnabled (true, false, this);
     masterVolSlider.setPopupMenuEnabled (true);
@@ -219,8 +217,6 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── Master Tune ─────────────────────────────────────────────────────
     masterTuneSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     masterTuneSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    masterTuneSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
-    masterTuneSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (masterTuneSlider);
     masterTuneSlider.setPopupDisplayEnabled (true, false, this);
     masterTuneSlider.setPopupMenuEnabled (true);
@@ -261,8 +257,6 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── Velocity Sensitivity ─────────────────────────────────────────────
     velocitySensSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     velocitySensSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    velocitySensSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
-    velocitySensSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (velocitySensSlider);
     velocitySensSlider.setPopupDisplayEnabled (true, false, this);
     velocitySensSlider.setPopupMenuEnabled (true);
@@ -279,8 +273,6 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── Pitch Bend Range ─────────────────────────────────────────────────
     pitchBendSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     pitchBendSlider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-    pitchBendSlider.setColour (juce::Slider::trackColourId, Colors::accentDim);
-    pitchBendSlider.setColour (juce::Slider::thumbColourId, Colors::accentActive);
     addAndMakeVisible (pitchBendSlider);
     pitchBendSlider.setPopupDisplayEnabled (true, false, this);
     pitchBendSlider.setPopupMenuEnabled (true);

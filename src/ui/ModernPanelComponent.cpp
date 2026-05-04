@@ -130,13 +130,11 @@ ModernPanelComponent::ModernPanelComponent (juce::AudioProcessorValueTreeState& 
 
 void ModernPanelComponent::styleKnob (juce::Slider& knob)
 {
-    knob.setSliderStyle (juce::Slider::LinearVertical);
-    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 48, 14);
-    knob.setColour (juce::Slider::trackColourId, Colors::accentDim);
-    knob.setColour (juce::Slider::thumbColourId, Colors::accentActive);
-    knob.setColour (juce::Slider::backgroundColourId, Colors::knobOutline);
-    knob.setColour (juce::Slider::textBoxTextColourId, Colors::textPrimary);
-    knob.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+    knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.2f,
+                              juce::MathConstants<float>::pi * 2.8f,
+                              true);
+    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 14);
     knob.setPopupMenuEnabled (true);
 }
 
@@ -234,8 +232,8 @@ void ModernPanelComponent::resized()
 
     // Derive slider sizes from available section content height
     int contentH = sectionH - headerArea - bottomPad;
-    int knobH = juce::jmax (56, contentH - labelH);  // slider height (tall)
-    int knobW = 40;  // vertical sliders are narrow
+    int knobH = juce::jmax (56, contentH - labelH);  // slider height
+    int knobW = 56;  // rotary diameter target
 
     // Combo / toggle sizing
     int comboH = juce::jlimit (22, 28, knobH / 2);
