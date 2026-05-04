@@ -65,7 +65,12 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
     addAndMakeVisible (panKnob);
 
     // Mix fader — every channel has one
+    // Mix uses LinearBar style — fills with primary as a coloured bar so
+    // it reads as "level" at a glance and is visually distinct from the
+    // thumb-on-track sliders used for Volume/Pan/etc.
     styleFader (mixFader);
+    mixFader.setSliderStyle (juce::Slider::LinearBar);
+    mixFader.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     mixFader.setTooltip ("Channel mix level (0-100%)");
     addAndMakeVisible (mixFader);
 

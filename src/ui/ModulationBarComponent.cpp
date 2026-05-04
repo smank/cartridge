@@ -369,9 +369,16 @@ void ModulationBarComponent::paint (juce::Graphics& g)
             auto ledBounds = section.withWidth (36).withSizeKeepingCentre ((int) ledSize, (int) ledSize).toFloat();
             if (enabled)
             {
-                g.setColour (Palette::primary.withAlpha (0.18f));
-                g.fillEllipse (ledBounds.expanded (5.0f));
-                g.setColour (Palette::primary.withAlpha (0.32f));
+                // Mod bar breathes a touch faster than FX so they don't
+                // pulse in unison — the eye reads them as separate sources.
+                const float t = (float) (juce::Time::getMillisecondCounter() % 3200) / 3200.0f;
+                const float breathe = 0.5f + 0.5f * std::sin (t * juce::MathConstants<float>::twoPi);
+                const float haloA  = 0.14f + 0.14f * breathe;
+                const float haloA2 = 0.26f + 0.10f * breathe;
+
+                g.setColour (Palette::primary.withAlpha (haloA));
+                g.fillEllipse (ledBounds.expanded (5.5f));
+                g.setColour (Palette::primary.withAlpha (haloA2));
                 g.fillEllipse (ledBounds.expanded (2.5f));
                 g.setColour (Palette::primary);
                 g.fillEllipse (ledBounds);

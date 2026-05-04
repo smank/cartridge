@@ -352,6 +352,32 @@ public:
         g.setColour (Palette::outline);
         g.drawRoundedRectangle (bounds, 4.0f, 1.0f);
     }
+
+    juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
+                                            juce::Rectangle<int> parentArea) override
+    {
+        // Tighter tooltip — give a bit more horizontal padding
+        auto bounds = juce::LookAndFeel_V4::getTooltipBounds (tipText, screenPos, parentArea);
+        return bounds.expanded (4, 2);
+    }
+
+    void drawTooltip (juce::Graphics& g, const juce::String& text, int width, int height) override
+    {
+        using namespace juce;
+        const auto bounds = Rectangle<int> (0, 0, width, height).toFloat();
+
+        // Soft inner glow + dark body
+        g.setColour (Palette::surface.darker (0.25f));
+        g.fillRoundedRectangle (bounds, 4.0f);
+
+        g.setColour (Palette::primary.withAlpha (0.55f));
+        g.drawRoundedRectangle (bounds.reduced (0.5f), 4.0f, 1.0f);
+
+        g.setColour (Palette::textPrimary);
+        g.setFont (labelFont (12.0f));
+        g.drawFittedText (text, bounds.toNearestInt().reduced (8, 4),
+                          Justification::centred, 4);
+    }
 };
 
 } // namespace cart::ui

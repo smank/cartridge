@@ -105,6 +105,13 @@ void WaveformDisplay::paint (juce::Graphics& g)
     g.setColour (Palette::hot);
     g.strokePath (path, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved));
 
+    // ─── CRT scanlines — every other row, very low alpha ──────────────
+    // Evokes the chiptune-era oscilloscope aesthetic without obscuring
+    // the trace. Cheap (one fillRect per scanline at 30Hz).
+    g.setColour (juce::Colours::black.withAlpha (0.10f));
+    for (float y = bounds.getY() + 1.0f; y < bounds.getBottom(); y += 2.0f)
+        g.fillRect (bounds.getX(), y, bounds.getWidth(), 1.0f);
+
     // Subtle watermark
     if (introAlpha < 1.0f)
     {

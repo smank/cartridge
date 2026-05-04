@@ -362,20 +362,23 @@ void EffectsBarComponent::paint (juce::Graphics& g)
             g.fillRect (section);
         }
 
-        // ─── LED — bigger, with glow when on ───────────────────────────
+        // ─── LED — bigger, with breathing glow when on ─────────────────
         const float ledSize = 12.0f;
         auto ledBounds = section.withWidth (36).withSizeKeepingCentre ((int) ledSize, (int) ledSize).toFloat();
         if (enabled)
         {
-            // Outer halo
-            g.setColour (Palette::hot.withAlpha (0.18f));
-            g.fillEllipse (ledBounds.expanded (5.0f));
-            g.setColour (Palette::hot.withAlpha (0.32f));
+            // Slow breathing on the halo so active effects feel "alive"
+            const float t = (float) (juce::Time::getMillisecondCounter() % 4000) / 4000.0f;
+            const float breathe = 0.5f + 0.5f * std::sin (t * juce::MathConstants<float>::twoPi);
+            const float haloA = 0.14f + 0.14f * breathe;
+            const float haloA2 = 0.26f + 0.10f * breathe;
+
+            g.setColour (Palette::hot.withAlpha (haloA));
+            g.fillEllipse (ledBounds.expanded (5.5f));
+            g.setColour (Palette::hot.withAlpha (haloA2));
             g.fillEllipse (ledBounds.expanded (2.5f));
-            // Core
             g.setColour (Palette::hot);
             g.fillEllipse (ledBounds);
-            // Specular highlight
             g.setColour (Palette::secondary.withAlpha (0.55f));
             g.fillEllipse (ledBounds.getX() + ledSize * 0.18f,
                            ledBounds.getY() + ledSize * 0.15f,
