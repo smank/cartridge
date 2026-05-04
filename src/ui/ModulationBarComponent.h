@@ -18,7 +18,9 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
-    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDown  (const juce::MouseEvent&) override;
+    void mouseMove  (const juce::MouseEvent&) override;
+    void mouseExit  (const juce::MouseEvent&) override;
     void timerCallback() override;
 
     int getDesiredHeight() const;
@@ -27,8 +29,8 @@ public:
     std::function<void()> onHeightChanged;
     std::function<void(const juce::File&)> onDpcmLoad;
 
-    static constexpr int headerHeight = 32;
-    static constexpr int detailHeight = 120;
+    static constexpr int headerHeight = 40;
+    static constexpr int detailHeight = 140;
 
 private:
     enum ModIndex { MOD_LFO = 0, MOD_PORTA, MOD_ARP, MOD_DPCM, MOD_SEQ, NUM_MOD };
@@ -41,6 +43,7 @@ private:
     void setDetailVisible (int modIndex, bool visible);
 
     int expandedMod = -1;
+    int hoveredSection = -1;
 
     // ─── LFO ────────────────────────────────────────────────────────────
     juce::ToggleButton lfoEnable;

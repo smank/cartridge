@@ -15,7 +15,9 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
-    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDown  (const juce::MouseEvent&) override;
+    void mouseMove  (const juce::MouseEvent&) override;
+    void mouseExit  (const juce::MouseEvent&) override;
     void timerCallback() override;
 
     int getDesiredHeight() const;
@@ -23,8 +25,8 @@ public:
 
     std::function<void()> onHeightChanged;
 
-    static constexpr int headerHeight = 32;
-    static constexpr int detailHeight = 120;
+    static constexpr int headerHeight = 40;
+    static constexpr int detailHeight = 140;
 
 private:
     enum EffectIndex { FX_CRUSH = 0, FX_FILTER, FX_CHORUS, FX_DELAY, FX_REVERB, NUM_FX };
@@ -35,6 +37,7 @@ private:
     void setDetailVisible (int fxIndex, bool visible);
 
     int expandedEffect = -1;
+    int hoveredSection = -1;
 
     // ─── BitCrush ──────────────────────────────────────────────────────
     juce::ToggleButton bcEnable;

@@ -58,24 +58,51 @@ public:
                            juce::Slider& slider) override
     {
         using namespace juce;
-        const auto bounds = Rectangle<int> (x, y, width, height).toFloat().reduced (6.0f);
+        const auto bounds = Rectangle<int> (x, y, width, height).toFloat().reduced (4.0f);
         const float radius = jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f;
-        if (radius < 4.0f) return;
+        if (radius < 6.0f) return;
 
         const Point<float> centre = bounds.getCentre();
         const float strokeWidth = Metrics::knobStrokeWidth;
         const float angle = rotaryStart + sliderPos * (rotaryEnd - rotaryStart);
+        const bool isHover = slider.isMouseOverOrDragging();
 
-        // Track arc (full sweep, dim)
+        // ─── Tick marks around the rim ────────────────────────────────────
+        // Stepped params get one tick per step (capped); continuous get 11.
+        int numTicks = 11;
+        if (slider.getInterval() > 0.0)
+        {
+            const double range = slider.getMaximum() - slider.getMinimum();
+            const int steps = (int) std::round (range / slider.getInterval()) + 1;
+            if (steps >= 2 && steps <= 17) numTicks = steps;
+        }
+        const float tickInner = radius - strokeWidth * 0.4f;
+        const float tickOuter = radius + 1.5f;
+        const bool bipolar = slider.getMinimum() < -0.001 && slider.getMaximum() > 0.001;
+        for (int t = 0; t < numTicks; ++t)
+        {
+            const float frac = (float) t / (float) (numTicks - 1);
+            const float a = rotaryStart + frac * (rotaryEnd - rotaryStart);
+            const float dx = std::sin (a);
+            const float dy = -std::cos (a);
+            // Centre tick on bipolar gets a brighter accent
+            const bool isCentreTick = bipolar && std::abs (frac - 0.5f) < 0.001f;
+            g.setColour (isCentreTick ? Palette::secondary.withAlpha (0.7f)
+                                      : Palette::outline.withAlpha (0.55f));
+            g.drawLine (centre.x + dx * tickInner, centre.y + dy * tickInner,
+                        centre.x + dx * tickOuter, centre.y + dy * tickOuter,
+                        isCentreTick ? 1.4f : 0.9f);
+        }
+
+        // ─── Track arc (dim, full sweep) ───────────────────────────────────
         Path track;
         track.addCentredArc (centre.x, centre.y, radius - strokeWidth, radius - strokeWidth,
                              0.0f, rotaryStart, rotaryEnd, true);
         g.setColour (Palette::outline);
         g.strokePath (track, PathStrokeType (strokeWidth, PathStrokeType::curved, PathStrokeType::rounded));
 
-        // Fill arc — bipolar from centre for ± params, otherwise from start
+        // ─── Fill arc — bipolar from centre, otherwise from start ─────────
         Path fill;
-        const bool bipolar = slider.getMinimum() < -0.001 && slider.getMaximum() > 0.001;
         if (bipolar)
         {
             const float midAngle = rotaryStart + (rotaryEnd - rotaryStart) * 0.5f;
@@ -87,28 +114,54 @@ public:
             fill.addCentredArc (centre.x, centre.y, radius - strokeWidth, radius - strokeWidth,
                                 0.0f, rotaryStart, angle, true);
         }
-        g.setColour (slider.isEnabled() ? Palette::primary : Palette::primaryDim);
-        g.strokePath (fill, PathStrokeType (strokeWidth, PathStrokeType::curved, PathStrokeType::rounded));
-
-        // Inner soft fill — gives the cap a tactile feel
-        const float innerR = radius - strokeWidth * 2.5f;
-        if (innerR > 2.0f)
+        const auto fillColour = slider.isEnabled() ? Palette::primary : Palette::primaryDim;
+        // Hover: thicker fill stroke + a soft outer glow
+        if (isHover && slider.isEnabled())
         {
-            g.setColour (Palette::surface);
+            g.setColour (Palette::hot.withAlpha (0.25f));
+            g.strokePath (fill, PathStrokeType (strokeWidth + 4.0f, PathStrokeType::curved, PathStrokeType::rounded));
+        }
+        g.setColour (fillColour);
+        g.strokePath (fill, PathStrokeType (isHover ? strokeWidth + 0.8f : strokeWidth,
+                                            PathStrokeType::curved, PathStrokeType::rounded));
+
+        // ─── Inner cap — radial gradient, tactile feel ────────────────────
+        const float innerR = radius - strokeWidth * 2.4f;
+        if (innerR > 3.0f)
+        {
+            ColourGradient capGrad (Palette::surfaceHi.brighter (0.05f),
+                                    centre.x - innerR * 0.35f, centre.y - innerR * 0.35f,
+                                    Palette::surface.darker (0.25f),
+                                    centre.x + innerR, centre.y + innerR,
+                                    true);
+            g.setGradientFill (capGrad);
             g.fillEllipse (centre.x - innerR, centre.y - innerR, innerR * 2.0f, innerR * 2.0f);
+
+            // Subtle inner bezel ring
+            g.setColour (Palette::outlineDim.withAlpha (0.6f));
+            g.drawEllipse (centre.x - innerR, centre.y - innerR, innerR * 2.0f, innerR * 2.0f, 0.8f);
         }
 
-        // Pointer
+        // ─── Pointer ──────────────────────────────────────────────────────
         Path pointer;
-        const float pointerLength = innerR * 0.75f;
-        const float pointerThick  = 3.0f;
-        pointer.addRectangle (-pointerThick * 0.5f, -innerR + 3.0f, pointerThick, pointerLength);
+        const float pointerLength = innerR * 0.78f;
+        const float pointerThick  = jmax (2.5f, radius * 0.10f);
+        pointer.addRoundedRectangle (-pointerThick * 0.5f, -innerR + 2.0f,
+                                     pointerThick, pointerLength,
+                                     pointerThick * 0.5f);
         g.setColour (Palette::secondary);
         g.fillPath (pointer, AffineTransform::rotation (angle).translated (centre));
 
-        // Pivot dot
+        // Bright dot at the indicator tip — gives the knob a "live" feel
+        const float tipR = jmax (1.5f, pointerThick * 0.7f);
+        const float tipX = centre.x + std::sin (angle) * (innerR - 4.0f);
+        const float tipY = centre.y - std::cos (angle) * (innerR - 4.0f);
+        g.setColour (slider.isEnabled() ? Palette::hot : Palette::primaryDim);
+        g.fillEllipse (tipX - tipR, tipY - tipR, tipR * 2.0f, tipR * 2.0f);
+
+        // ─── Pivot ────────────────────────────────────────────────────────
         g.setColour (Palette::outline);
-        g.fillEllipse (centre.x - 2.0f, centre.y - 2.0f, 4.0f, 4.0f);
+        g.fillEllipse (centre.x - 2.5f, centre.y - 2.5f, 5.0f, 5.0f);
     }
 
     void drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height,

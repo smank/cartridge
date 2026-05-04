@@ -303,9 +303,9 @@ void EffectsBarComponent::mouseDown (const juce::MouseEvent& e)
     int sectionW = getWidth() / NUM_FX;
     int fxIndex = juce::jmin (pos.getX() / sectionW, (int) NUM_FX - 1);
 
-    // Check if click is on the LED area (left 28px of section)
+    // Check if click is on the LED area (left 36px of section)
     int localX = pos.getX() - fxIndex * sectionW;
-    if (localX < 28)
+    if (localX < 36)
     {
         // Toggle the enable button for this effect
         juce::ToggleButton* enableButtons[] = { &bcEnable, &fltEnable, &chEnable, &dlEnable, &rvEnable };
@@ -321,17 +321,21 @@ void EffectsBarComponent::mouseDown (const juce::MouseEvent& e)
 
 void EffectsBarComponent::paint (juce::Graphics& g)
 {
+    using namespace cart::ui;
     auto bounds = getLocalBounds();
     int sectionW = bounds.getWidth() / NUM_FX;
 
-    // ─── Header background ─────────────────────────────────────────────
+    // ─── Header background — subtle vertical gradient ──────────────────
     auto headerArea = bounds.removeFromTop (headerHeight);
-    g.setColour (Colors::bgMid);
+    g.setGradientFill (juce::ColourGradient (
+        Palette::surface, 0.0f, (float) headerArea.getY(),
+        Palette::background.brighter (0.05f), 0.0f, (float) headerArea.getBottom(),
+        false));
     g.fillRect (headerArea);
 
-    // Top edge accent
-    g.setColour (Colors::divider.withAlpha (0.3f));
-    g.fillRect (headerArea.getX(), headerArea.getY(), headerArea.getWidth(), 1);
+    // Top edge — bright FX accent stripe so the bar reads as "active region"
+    g.setColour (Palette::hot.withAlpha (0.55f));
+    g.fillRect (headerArea.getX(), headerArea.getY(), headerArea.getWidth(), 2);
 
     const juce::String fxNames[] = { "CRUSH", "FILTER", "CHORUS", "DELAY", "REVERB" };
     const juce::ToggleButton* enableButtons[] = { &bcEnable, &fltEnable, &chEnable, &dlEnable, &rvEnable };
@@ -339,44 +343,85 @@ void EffectsBarComponent::paint (juce::Graphics& g)
     for (int i = 0; i < NUM_FX; ++i)
     {
         auto section = headerArea.withX (i * sectionW).withWidth (sectionW);
-        bool enabled = enableButtons[i]->getToggleState();
-        bool expanded = (expandedEffect == i);
+        const bool enabled  = enableButtons[i]->getToggleState();
+        const bool expanded = (expandedEffect == i);
+        const bool hovered  = (hoveredSection == i);
 
+        // Hovered or expanded section gets a brighter background
         if (expanded)
         {
-            g.setColour (Colors::bgLight);
+            g.setColour (Palette::surfaceHi);
+            g.fillRect (section);
+            // Bright top stripe to indicate the active panel
+            g.setColour (Palette::hot);
+            g.fillRect (section.getX(), section.getY(), section.getWidth(), 2);
+        }
+        else if (hovered)
+        {
+            g.setColour (Palette::surfaceHi.withAlpha (0.55f));
             g.fillRect (section);
         }
 
-        // LED — smaller, cleaner
-        auto ledBounds = section.withWidth (26).withSizeKeepingCentre (8, 8).toFloat();
+        // ─── LED — bigger, with glow when on ───────────────────────────
+        const float ledSize = 12.0f;
+        auto ledBounds = section.withWidth (36).withSizeKeepingCentre ((int) ledSize, (int) ledSize).toFloat();
         if (enabled)
         {
-            g.setColour (Colors::fxAccent);
+            // Outer halo
+            g.setColour (Palette::hot.withAlpha (0.18f));
+            g.fillEllipse (ledBounds.expanded (5.0f));
+            g.setColour (Palette::hot.withAlpha (0.32f));
+            g.fillEllipse (ledBounds.expanded (2.5f));
+            // Core
+            g.setColour (Palette::hot);
             g.fillEllipse (ledBounds);
-            // Glow
-            g.setColour (Colors::fxAccent.withAlpha (0.2f));
-            g.fillEllipse (ledBounds.expanded (3.0f));
+            // Specular highlight
+            g.setColour (Palette::secondary.withAlpha (0.55f));
+            g.fillEllipse (ledBounds.getX() + ledSize * 0.18f,
+                           ledBounds.getY() + ledSize * 0.15f,
+                           ledSize * 0.32f, ledSize * 0.32f);
         }
         else
         {
-            g.setColour (Colors::knobOutline.withAlpha (0.6f));
-            g.drawEllipse (ledBounds, 1.0f);
+            g.setColour (Palette::outline);
+            g.drawEllipse (ledBounds, 1.2f);
+            g.setColour (Palette::surface.darker (0.3f));
+            g.fillEllipse (ledBounds.reduced (1.2f));
         }
 
-        auto textArea = section.withTrimmedLeft (26);
-        g.setColour (enabled ? Colors::textPrimary : Colors::textSecondary);
-        g.setFont (juce::FontOptions (11.0f));
+        // Section name
+        const auto textArea = section.withTrimmedLeft (36).withTrimmedRight (24);
+        g.setColour (enabled ? Palette::textPrimary : Palette::textSecondary);
+        g.setFont (displayFont (12.0f));
+        g.drawText (fxNames[i], textArea, juce::Justification::centredLeft);
 
-        juce::String label = fxNames[i];
-        if (expanded) label += " " + juce::String::charToString (0x25BE);
-        g.drawText (label, textArea, juce::Justification::centredLeft);
+        // Chevron — points down when expanded, right when collapsed
+        const float chevR = 4.0f;
+        const float chevX = (float) section.getRight() - 16.0f;
+        const float chevY = (float) section.getCentreY();
+        juce::Path chev;
+        if (expanded)
+        {
+            chev.addTriangle (chevX - chevR, chevY - chevR * 0.4f,
+                              chevX + chevR, chevY - chevR * 0.4f,
+                              chevX,         chevY + chevR * 0.6f);
+        }
+        else
+        {
+            chev.addTriangle (chevX - chevR * 0.4f, chevY - chevR,
+                              chevX - chevR * 0.4f, chevY + chevR,
+                              chevX + chevR * 0.6f, chevY);
+        }
+        g.setColour (expanded ? Palette::hot
+                              : (hovered ? Palette::secondary : Palette::textSecondary));
+        g.fillPath (chev);
 
+        // Section divider
         if (i < NUM_FX - 1)
         {
-            g.setColour (Colors::divider.withAlpha (0.25f));
-            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 6.0f,
-                                (float) headerArea.getBottom() - 6.0f);
+            g.setColour (Palette::outlineDim.withAlpha (0.5f));
+            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 8.0f,
+                                (float) headerArea.getBottom() - 8.0f);
         }
     }
 
@@ -384,22 +429,51 @@ void EffectsBarComponent::paint (juce::Graphics& g)
     if (expandedEffect >= 0)
     {
         auto detailArea = getLocalBounds().withTop (headerHeight);
-        g.setColour (Colors::bgLight);
+        // Slightly brighter than header for clear separation
+        g.setColour (Palette::surfaceHi);
         g.fillRect (detailArea);
 
-        g.setColour (Colors::fxAccent.withAlpha (0.3f));
+        // Glowing top edge tying detail to the expanded section header
+        g.setColour (Palette::hot.withAlpha (0.7f));
         g.fillRect (0, headerHeight, getWidth(), 1);
+        g.setColour (Palette::hot.withAlpha (0.18f));
+        g.fillRect (0, headerHeight + 1, getWidth(), 4);
+    }
+}
+
+void EffectsBarComponent::mouseMove (const juce::MouseEvent& e)
+{
+    int newHover = -1;
+    if (e.getPosition().getY() < headerHeight)
+    {
+        const int sectionW = getWidth() / NUM_FX;
+        if (sectionW > 0)
+            newHover = juce::jmin (e.getPosition().getX() / sectionW, (int) NUM_FX - 1);
+    }
+    if (newHover != hoveredSection)
+    {
+        hoveredSection = newHover;
+        repaint (0, 0, getWidth(), headerHeight);
+    }
+}
+
+void EffectsBarComponent::mouseExit (const juce::MouseEvent&)
+{
+    if (hoveredSection != -1)
+    {
+        hoveredSection = -1;
+        repaint (0, 0, getWidth(), headerHeight);
     }
 }
 
 void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIndex)
 {
-    constexpr int colW   = 84;
-    constexpr int colGap = 8;
+    constexpr int colW   = 100;
+    constexpr int colGap = 12;
     constexpr int labelH = 14;
-    constexpr int comboH = 22;
+    constexpr int comboH = 24;
 
-    area = area.reduced (10, 8);
+    area = area.reduced (12, 10);
 
     // Centre the column row horizontally
     auto centreColumns = [&] (int numColumns)

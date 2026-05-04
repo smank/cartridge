@@ -301,9 +301,9 @@ void ModulationBarComponent::mouseDown (const juce::MouseEvent& e)
     int sectionW = getWidth() / NUM_MOD;
     int modIndex = juce::jmin (pos.getX() / sectionW, (int) NUM_MOD - 1);
 
-    // Check if click is on the LED area (left 28px of section) — only for sections with enable buttons
+    // Check if click is on the LED area (left 36px of section) — only for sections with enable buttons
     int localX = pos.getX() - modIndex * sectionW;
-    if (localX < 28 && modIndex != MOD_DPCM)
+    if (localX < 36 && modIndex != MOD_DPCM)
     {
         // Toggle the enable button for this mod
         juce::ToggleButton* enableButtons[] = { &lfoEnable, &portaEnable, &arpEnable, nullptr, &seqEnable };
@@ -322,16 +322,21 @@ void ModulationBarComponent::mouseDown (const juce::MouseEvent& e)
 
 void ModulationBarComponent::paint (juce::Graphics& g)
 {
+    using namespace cart::ui;
     auto bounds = getLocalBounds();
     int sectionW = bounds.getWidth() / NUM_MOD;
 
-    // ─── Header background ─────────────────────────────────────────────
+    // ─── Header background — gradient, slightly cooler than FX bar ─────
     auto headerArea = bounds.removeFromTop (headerHeight);
-    g.setColour (Colors::bgMid);
+    g.setGradientFill (juce::ColourGradient (
+        Palette::surface, 0.0f, (float) headerArea.getY(),
+        Palette::background.brighter (0.05f), 0.0f, (float) headerArea.getBottom(),
+        false));
     g.fillRect (headerArea);
 
-    g.setColour (Colors::divider.withAlpha (0.3f));
-    g.fillRect (headerArea.getX(), headerArea.getY(), headerArea.getWidth(), 1);
+    // Top edge — primary (cooler red than FX's hot)
+    g.setColour (Palette::primary.withAlpha (0.5f));
+    g.fillRect (headerArea.getX(), headerArea.getY(), headerArea.getWidth(), 2);
 
     const juce::String modNames[] = { "LFO", "PORTA", "ARP", "DPCM", "SEQ" };
     const juce::ToggleButton* enableButtons[] = { &lfoEnable, &portaEnable, &arpEnable, nullptr, &seqEnable };
@@ -339,46 +344,84 @@ void ModulationBarComponent::paint (juce::Graphics& g)
     for (int i = 0; i < NUM_MOD; ++i)
     {
         auto section = headerArea.withX (i * sectionW).withWidth (sectionW);
-        bool enabled = enableButtons[i] != nullptr && enableButtons[i]->getToggleState();
-        bool expanded = (expandedMod == i);
+        const bool hasLED   = (enableButtons[i] != nullptr);
+        const bool enabled  = hasLED && enableButtons[i]->getToggleState();
+        const bool expanded = (expandedMod == i);
+        const bool hovered  = (hoveredSection == i);
 
         if (expanded)
         {
-            g.setColour (Colors::bgLight);
+            g.setColour (Palette::surfaceHi);
+            g.fillRect (section);
+            g.setColour (Palette::primary);
+            g.fillRect (section.getX(), section.getY(), section.getWidth(), 2);
+        }
+        else if (hovered)
+        {
+            g.setColour (Palette::surfaceHi.withAlpha (0.55f));
             g.fillRect (section);
         }
 
-        if (enableButtons[i] != nullptr)
+        // ─── LED ────────────────────────────────────────────────────────
+        if (hasLED)
         {
-            auto ledBounds = section.withWidth (26).withSizeKeepingCentre (8, 8).toFloat();
+            const float ledSize = 12.0f;
+            auto ledBounds = section.withWidth (36).withSizeKeepingCentre ((int) ledSize, (int) ledSize).toFloat();
             if (enabled)
             {
-                g.setColour (Colors::accentActive);
+                g.setColour (Palette::primary.withAlpha (0.18f));
+                g.fillEllipse (ledBounds.expanded (5.0f));
+                g.setColour (Palette::primary.withAlpha (0.32f));
+                g.fillEllipse (ledBounds.expanded (2.5f));
+                g.setColour (Palette::primary);
                 g.fillEllipse (ledBounds);
-                g.setColour (Colors::accentActive.withAlpha (0.2f));
-                g.fillEllipse (ledBounds.expanded (3.0f));
+                g.setColour (Palette::secondary.withAlpha (0.55f));
+                g.fillEllipse (ledBounds.getX() + ledSize * 0.18f,
+                               ledBounds.getY() + ledSize * 0.15f,
+                               ledSize * 0.32f, ledSize * 0.32f);
             }
             else
             {
-                g.setColour (Colors::knobOutline.withAlpha (0.6f));
-                g.drawEllipse (ledBounds, 1.0f);
+                g.setColour (Palette::outline);
+                g.drawEllipse (ledBounds, 1.2f);
+                g.setColour (Palette::surface.darker (0.3f));
+                g.fillEllipse (ledBounds.reduced (1.2f));
             }
         }
 
-        auto textArea = (enableButtons[i] != nullptr) ? section.withTrimmedLeft (26) : section;
-        g.setColour (enabled ? Colors::textPrimary : Colors::textSecondary);
-        g.setFont (juce::FontOptions (11.0f));
+        const auto textArea = (hasLED ? section.withTrimmedLeft (36)
+                                      : section.withTrimmedLeft (12))
+                              .withTrimmedRight (24);
+        g.setColour (enabled || ! hasLED ? Palette::textPrimary : Palette::textSecondary);
+        g.setFont (displayFont (12.0f));
+        g.drawText (modNames[i], textArea, juce::Justification::centredLeft);
 
-        juce::String label = modNames[i];
-        if (expanded) label += " " + juce::String::charToString (0x25BE);
-        else if (i == MOD_DPCM) label += " " + juce::String::charToString (0x25B8);
-        g.drawText (label, textArea, juce::Justification::centredLeft);
+        // Chevron
+        const float chevR = 4.0f;
+        const float chevX = (float) section.getRight() - 16.0f;
+        const float chevY = (float) section.getCentreY();
+        juce::Path chev;
+        if (expanded)
+        {
+            chev.addTriangle (chevX - chevR, chevY - chevR * 0.4f,
+                              chevX + chevR, chevY - chevR * 0.4f,
+                              chevX,         chevY + chevR * 0.6f);
+        }
+        else
+        {
+            chev.addTriangle (chevX - chevR * 0.4f, chevY - chevR,
+                              chevX - chevR * 0.4f, chevY + chevR,
+                              chevX + chevR * 0.6f, chevY);
+        }
+        g.setColour (expanded ? Palette::primary
+                              : (hovered ? Palette::secondary : Palette::textSecondary));
+        g.fillPath (chev);
 
         if (i < NUM_MOD - 1)
         {
-            g.setColour (Colors::divider.withAlpha (0.25f));
-            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 6.0f,
-                                (float) headerArea.getBottom() - 6.0f);
+            g.setColour (Palette::outlineDim.withAlpha (0.5f));
+            g.drawVerticalLine ((i + 1) * sectionW, (float) headerArea.getY() + 8.0f,
+                                (float) headerArea.getBottom() - 8.0f);
         }
     }
 
@@ -386,22 +429,48 @@ void ModulationBarComponent::paint (juce::Graphics& g)
     if (expandedMod >= 0)
     {
         auto detailArea = getLocalBounds().withTop (headerHeight);
-        g.setColour (Colors::bgLight);
+        g.setColour (Palette::surfaceHi);
         g.fillRect (detailArea);
-
-        g.setColour (Colors::accentActive.withAlpha (0.3f));
+        g.setColour (Palette::primary.withAlpha (0.7f));
         g.fillRect (0, headerHeight, getWidth(), 1);
+        g.setColour (Palette::primary.withAlpha (0.18f));
+        g.fillRect (0, headerHeight + 1, getWidth(), 4);
+    }
+}
+
+void ModulationBarComponent::mouseMove (const juce::MouseEvent& e)
+{
+    int newHover = -1;
+    if (e.getPosition().getY() < headerHeight)
+    {
+        const int sectionW = getWidth() / NUM_MOD;
+        if (sectionW > 0)
+            newHover = juce::jmin (e.getPosition().getX() / sectionW, (int) NUM_MOD - 1);
+    }
+    if (newHover != hoveredSection)
+    {
+        hoveredSection = newHover;
+        repaint (0, 0, getWidth(), headerHeight);
+    }
+}
+
+void ModulationBarComponent::mouseExit (const juce::MouseEvent&)
+{
+    if (hoveredSection != -1)
+    {
+        hoveredSection = -1;
+        repaint (0, 0, getWidth(), headerHeight);
     }
 }
 
 void ModulationBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int modIndex)
 {
-    constexpr int colW   = 84;
-    constexpr int colGap = 8;
+    constexpr int colW   = 100;
+    constexpr int colGap = 12;
     constexpr int labelH = 14;
-    constexpr int comboH = 22;
+    constexpr int comboH = 24;
 
-    area = area.reduced (10, 8);
+    area = area.reduced (12, 10);
 
     auto centreColumns = [&] (int numColumns)
     {

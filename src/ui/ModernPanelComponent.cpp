@@ -232,8 +232,8 @@ void ModernPanelComponent::resized()
 
     // Derive slider sizes from available section content height
     int contentH = sectionH - headerArea - bottomPad;
-    int knobH = juce::jmax (56, contentH - labelH);  // slider height
-    int knobW = 56;  // rotary diameter target
+    int knobH = juce::jmax (60, contentH - labelH);  // slider height
+    int knobW = 64;  // rotary diameter target
 
     // Combo / toggle sizing
     int comboH = juce::jlimit (22, 28, knobH / 2);
