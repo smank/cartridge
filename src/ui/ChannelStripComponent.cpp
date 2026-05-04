@@ -5,12 +5,22 @@ namespace cart {
 
 namespace
 {
-    // All sliders in a strip share the same style — the LookAndFeel handles
-    // colours via Palette so we don't override here.
+    // Horizontal sliders for narrow rows (transpose, sweep, linear counter)
     void styleKnob (juce::Slider& knob)
     {
         knob.setSliderStyle (juce::Slider::LinearHorizontal);
         knob.setTextBoxStyle (juce::Slider::TextBoxRight, false, 36, 14);
+        knob.setPopupMenuEnabled (true);
+    }
+
+    // Rotary used for the prominent strip controls (Volume, Pan, Main knob)
+    void styleRotaryKnob (juce::Slider& knob)
+    {
+        knob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.2f,
+                                  juce::MathConstants<float>::pi * 2.8f,
+                                  true);
+        knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 40, 12);
         knob.setPopupMenuEnabled (true);
     }
 
@@ -60,8 +70,8 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
     nameLabel.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (nameLabel);
 
-    // Pan knob — every channel has one
-    styleKnob (panKnob);
+    // Pan knob — every channel has one (rotary, sits next to Volume)
+    styleRotaryKnob (panKnob);
     panKnob.setTooltip ("Stereo pan position (L/R)");
     addAndMakeVisible (panKnob);
 
@@ -225,7 +235,7 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
 
     // Volume knob
     hasVolume = true;
-    styleKnob (volumeKnob);
+    styleRotaryKnob (volumeKnob);
     volumeKnob.setTooltip ("Channel volume (0-15)");
     addAndMakeVisible (volumeKnob);
     volumeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -359,7 +369,7 @@ void ChannelStripComponent::setupNoiseControls (juce::AudioProcessorValueTreeSta
 
     // Volume knob
     hasVolume = true;
-    styleKnob (volumeKnob);
+    styleRotaryKnob (volumeKnob);
     volumeKnob.setTooltip ("Noise volume (0-15)");
     addAndMakeVisible (volumeKnob);
     volumeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -399,7 +409,7 @@ void ChannelStripComponent::setupDpcmControls (juce::AudioProcessorValueTreeStat
     // Rate knob
     hasMainKnob = true;
     hasMainCombo = false;
-    styleKnob (mainKnob);
+    styleRotaryKnob (mainKnob);
     mainKnob.setTooltip ("DPCM playback rate index");
     addAndMakeVisible (mainKnob);
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -439,7 +449,7 @@ void ChannelStripComponent::setupVrc6PulseControls (const juce::String& prefix,
     // Duty knob (0–7)
     hasMainKnob = true;
     hasMainCombo = false;
-    styleKnob (mainKnob);
+    styleRotaryKnob (mainKnob);
     mainKnob.setTooltip ("VRC6 pulse duty cycle (0-7, 8 levels)");
     addAndMakeVisible (mainKnob);
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -456,7 +466,7 @@ void ChannelStripComponent::setupVrc6PulseControls (const juce::String& prefix,
 
     // Volume knob
     hasVolume = true;
-    styleKnob (volumeKnob);
+    styleRotaryKnob (volumeKnob);
     volumeKnob.setTooltip ("VRC6 pulse volume (0-15)");
     addAndMakeVisible (volumeKnob);
     volumeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -482,7 +492,7 @@ void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeS
     // Rate knob
     hasMainKnob = true;
     hasMainCombo = false;
-    styleKnob (mainKnob);
+    styleRotaryKnob (mainKnob);
     mainKnob.setTooltip ("VRC6 sawtooth accumulator rate (0-63)");
     addAndMakeVisible (mainKnob);
     mainKnobAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -687,8 +697,9 @@ void ChannelStripComponent::resized()
     const int pad = 3;
     const int sliderH = 22;
     const int labelH = 13;
+    const int rotaryH = 54;   // total slider height for vol/pan/main rotaries
 
-    // --- Header — replaces the old name row + enable row + details row ---
+    // ─── Header (replaces the old name row + enable row + details row) ─
     auto header = area.removeFromTop (headerHeight);
     nameLabel.setBounds (header.reduced (ledClickWidth, 0).withTrimmedRight (16));
 
@@ -700,7 +711,34 @@ void ChannelStripComponent::resized()
     // 2px stripe + small gap before body controls
     area.removeFromTop (6);
 
-    // Main combo (if any)
+    // ─── Bottom-up: Mix LinearBar + Vol/Pan side-by-side rotaries ────
+    // Reserved first so they always sit at the bottom of the strip.
+    auto mixSliderArea = area.removeFromBottom (sliderH);
+    area.removeFromBottom (labelH);  // "MIX" label space
+    mixFader.setBounds (mixSliderArea.reduced (2, 0));
+    area.removeFromBottom (pad);
+
+    if (hasVolume)
+    {
+        auto vpRow = area.removeFromBottom (rotaryH);
+        area.removeFromBottom (labelH);  // "VOL" / "PAN" labels
+        const int half = vpRow.getWidth() / 2;
+        volumeKnob.setBounds (vpRow.removeFromLeft (half).reduced (2, 0));
+        vpRow.removeFromLeft (2);
+        panKnob.setBounds (vpRow.reduced (2, 0));
+    }
+    else
+    {
+        // Triangle: no volume; "Fixed" label + Pan rotary centred under it
+        auto panRow = area.removeFromBottom (rotaryH);
+        area.removeFromBottom (labelH);
+        const int knobW = juce::jmin (50, panRow.getWidth());
+        panKnob.setBounds (panRow.withSizeKeepingCentre (knobW, rotaryH));
+        volumeLabel.setBounds (area.removeFromBottom (16));
+    }
+    area.removeFromBottom (pad);
+
+    // ─── Top-down: main combo / main knob / transpose ─────────────────
     if (hasMainCombo)
     {
         area.removeFromTop (labelH);
@@ -708,12 +746,20 @@ void ChannelStripComponent::resized()
         area.removeFromTop (pad);
     }
 
-    // Main knob/slider (if any)
     if (hasMainKnob)
     {
         area.removeFromTop (labelH);
-        auto& knob = hasMainCombo ? noisePeriodKnob : mainKnob;
-        knob.setBounds (area.removeFromTop (sliderH).reduced (2, 0));
+        if (hasMainCombo)
+        {
+            // Noise period — narrow horizontal under the Mode combo
+            noisePeriodKnob.setBounds (area.removeFromTop (sliderH).reduced (2, 0));
+        }
+        else
+        {
+            // Solo main knob (DPCM, VRC6 Pulse/Saw) — rotary centred
+            const int knobW = juce::jmin (60, area.getWidth() - 8);
+            mainKnob.setBounds (area.removeFromTop (rotaryH).withSizeKeepingCentre (knobW, rotaryH));
+        }
         area.removeFromTop (pad);
     }
     else if (! hasMainCombo)
@@ -722,7 +768,6 @@ void ChannelStripComponent::resized()
         area.removeFromTop (pad);
     }
 
-    // Transpose slider
     if (hasTranspose)
     {
         area.removeFromTop (labelH);
@@ -730,26 +775,12 @@ void ChannelStripComponent::resized()
         area.removeFromTop (pad);
     }
 
-    // Volume slider or label
-    if (hasVolume)
-    {
-        area.removeFromTop (labelH);
-        volumeKnob.setBounds (area.removeFromTop (sliderH).reduced (2, 0));
-        area.removeFromTop (pad);
-    }
-    else
-    {
-        volumeLabel.setBounds (area.removeFromTop (16));
-        area.removeFromTop (pad);
-    }
-
-    // Details expandable area — toggle is now in the header chevron
+    // ─── Details panel — fills any remaining mid-area when expanded ───
     if (hasDetails)
     {
         if (detailsVisible)
         {
-            int detailH = juce::jmin (140, area.getHeight() - sliderH - labelH - pad);
-            detailH = juce::jmax (0, detailH);
+            int detailH = juce::jmax (0, area.getHeight());
             auto detailArea = area.removeFromTop (detailH);
             const int rowH = 20;
 
@@ -818,26 +849,8 @@ void ChannelStripComponent::resized()
             dpcmLoopToggle.setVisible (false);
         }
     }
-
-    // Pan + Mix faders at bottom, labels drawn by paint() above them
-    // Guard: ensure bottom controls don't overlap top controls
-    int bottomNeeded = (sliderH + labelH) * 2;
-    if (area.getHeight() >= bottomNeeded)
-    {
-        mixFader.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
-        area.removeFromBottom (labelH);  // "MIX" label
-        panKnob.setBounds (area.removeFromBottom (sliderH).reduced (2, 0));
-        area.removeFromBottom (labelH);  // "PAN" label
-    }
-    else
-    {
-        // Tight space — stack pan and mix into whatever remains, no label gaps
-        auto bottom = getLocalBounds().reduced (3).removeFromBottom (bottomNeeded);
-        bottom.removeFromTop (2); // small pad
-        panKnob.setBounds (bottom.removeFromTop (sliderH).reduced (2, 0));
-        bottom.removeFromTop (labelH);
-        mixFader.setBounds (bottom.removeFromTop (sliderH).reduced (2, 0));
-    }
+    // Pan, Vol, and Mix were laid out at the start of this function from
+    // the bottom up; nothing else needs placement here.
 }
 
 } // namespace cart
