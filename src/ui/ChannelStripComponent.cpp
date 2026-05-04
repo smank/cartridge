@@ -697,7 +697,9 @@ void ChannelStripComponent::resized()
     const int pad = 3;
     const int sliderH = 22;
     const int labelH = 13;
-    const int rotaryH = 54;   // total slider height for vol/pan/main rotaries
+    const int comboH = 24;
+    const int minRotaryH = 56;
+    const int maxRotaryH = 120;
 
     // ─── Header (replaces the old name row + enable row + details row) ─
     auto header = area.removeFromTop (headerHeight);
@@ -708,41 +710,58 @@ void ChannelStripComponent::resized()
     enableToggle.setBounds (0, 0, 0, 0);
     detailsButton.setBounds (0, 0, 0, 0);
 
-    // 2px stripe + small gap before body controls
+    // Stripe + small gap before body controls
     area.removeFromTop (6);
 
-    // ─── Bottom-up: Mix LinearBar + Vol/Pan side-by-side rotaries ────
-    // Reserved first so they always sit at the bottom of the strip.
+    // ─── Reserve Mix at the very bottom (always anchored there) ──────
     auto mixSliderArea = area.removeFromBottom (sliderH);
     area.removeFromBottom (labelH);  // "MIX" label space
     mixFader.setBounds (mixSliderArea.reduced (2, 0));
     area.removeFromBottom (pad);
 
-    if (hasVolume)
+    // ─── Reserve details panel from the bottom when expanded ─────────
+    juce::Rectangle<int> detailArea;
+    if (hasDetails && detailsVisible)
     {
-        auto vpRow = area.removeFromBottom (rotaryH);
-        area.removeFromBottom (labelH);  // "VOL" / "PAN" labels
-        const int half = vpRow.getWidth() / 2;
-        volumeKnob.setBounds (vpRow.removeFromLeft (half).reduced (2, 0));
-        vpRow.removeFromLeft (2);
-        panKnob.setBounds (vpRow.reduced (2, 0));
+        const int detailH = juce::jmin (140, juce::jmax (0, area.getHeight() / 2));
+        detailArea = area.removeFromBottom (detailH);
+        area.removeFromBottom (pad);
+    }
+
+    // ─── Compute rotary row height that fills remaining body ─────────
+    // Count rotary rows and the fixed consumption of non-rotary controls.
+    int rotaryRows = 1;  // vol+pan or pan-alone always present
+    int fixedConsumption = labelH + pad;  // for the vol/pan label row
+
+    if (hasMainCombo)
+    {
+        fixedConsumption += labelH + comboH + pad;
+        if (hasMainKnob)  // noisePeriod horizontal under Mode combo
+            fixedConsumption += labelH + sliderH + pad;
+    }
+    else if (hasMainKnob)
+    {
+        // Solo main knob — also a rotary row
+        ++rotaryRows;
+        fixedConsumption += labelH + pad;
     }
     else
     {
-        // Triangle: no volume; "Fixed" label + Pan rotary centred under it
-        auto panRow = area.removeFromBottom (rotaryH);
-        area.removeFromBottom (labelH);
-        const int knobW = juce::jmin (50, panRow.getWidth());
-        panKnob.setBounds (panRow.withSizeKeepingCentre (knobW, rotaryH));
-        volumeLabel.setBounds (area.removeFromBottom (16));
+        fixedConsumption += 16 + pad;  // mainLabel "32-Step" etc
     }
-    area.removeFromBottom (pad);
+
+    if (hasTranspose) fixedConsumption += labelH + sliderH + pad;
+    if (! hasVolume)  fixedConsumption += 16 + pad;  // "Fixed" label
+
+    const int spaceForRotaries = juce::jmax (0, area.getHeight() - fixedConsumption);
+    const int rotaryH = juce::jlimit (minRotaryH, maxRotaryH,
+                                       rotaryRows > 0 ? spaceForRotaries / rotaryRows : minRotaryH);
 
     // ─── Top-down: main combo / main knob / transpose ─────────────────
     if (hasMainCombo)
     {
         area.removeFromTop (labelH);
-        mainCombo.setBounds (area.removeFromTop (24).reduced (2, 0));
+        mainCombo.setBounds (area.removeFromTop (comboH).reduced (2, 0));
         area.removeFromTop (pad);
     }
 
@@ -751,13 +770,12 @@ void ChannelStripComponent::resized()
         area.removeFromTop (labelH);
         if (hasMainCombo)
         {
-            // Noise period — narrow horizontal under the Mode combo
             noisePeriodKnob.setBounds (area.removeFromTop (sliderH).reduced (2, 0));
         }
         else
         {
-            // Solo main knob (DPCM, VRC6 Pulse/Saw) — rotary centred
-            const int knobW = juce::jmin (60, area.getWidth() - 8);
+            // Solo main knob — rotary scaled to row height
+            const int knobW = juce::jmin (rotaryH + 28, area.getWidth() - 8);
             mainKnob.setBounds (area.removeFromTop (rotaryH).withSizeKeepingCentre (knobW, rotaryH));
         }
         area.removeFromTop (pad);
@@ -775,13 +793,35 @@ void ChannelStripComponent::resized()
         area.removeFromTop (pad);
     }
 
-    // ─── Details panel — fills any remaining mid-area when expanded ───
+    if (! hasVolume)
+    {
+        volumeLabel.setBounds (area.removeFromTop (16));
+        area.removeFromTop (pad);
+    }
+
+    // ─── Vol + Pan rotaries (always at the bottom of the body flow) ──
+    {
+        area.removeFromTop (labelH);  // "VOL" / "PAN" label row drawn by paint()
+        auto vpRow = area.removeFromTop (rotaryH);
+        if (hasVolume)
+        {
+            const int half = vpRow.getWidth() / 2;
+            volumeKnob.setBounds (vpRow.removeFromLeft (half).reduced (2, 0));
+            vpRow.removeFromLeft (2);
+            panKnob.setBounds (vpRow.reduced (2, 0));
+        }
+        else
+        {
+            const int knobW = juce::jmin (rotaryH + 28, vpRow.getWidth() - 8);
+            panKnob.setBounds (vpRow.withSizeKeepingCentre (knobW, rotaryH));
+        }
+    }
+
+    // ─── Details panel layout into the reserved bottom area ──────────
     if (hasDetails)
     {
         if (detailsVisible)
         {
-            int detailH = juce::jmax (0, area.getHeight());
-            auto detailArea = area.removeFromTop (detailH);
             const int rowH = 20;
 
             switch (channelType)
