@@ -57,6 +57,7 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
     nameLabel.setFont (cart::ui::displayFont (13.0f));
     nameLabel.setColour (juce::Label::textColourId, nameColour);
     nameLabel.setJustificationType (juce::Justification::centred);
+    nameLabel.setInterceptsMouseClicks (false, false);
     addAndMakeVisible (nameLabel);
 
     // Pan knob — every channel has one
@@ -74,15 +75,15 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
     mixFader.setTooltip ("Channel mix level (0-100%)");
     addAndMakeVisible (mixFader);
 
-    // Details button styling
-    detailsButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
-    detailsButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
-    detailsButton.setColour (juce::TextButton::textColourOnId, Colors::accentActive);
+    // Details state — toggled by clicking the strip header chevron.
+    // detailsButton stays invisible (size 0) but holds the toggle state so
+    // any external code that polls it still works.
     detailsButton.setClickingTogglesState (true);
     detailsButton.onClick = [this]
     {
         detailsVisible = detailsButton.getToggleState();
         resized();
+        repaint();
     };
 
     // Wire up pan knob attachment based on channel type
@@ -130,8 +131,55 @@ void ChannelStripComponent::timerCallback()
     if (newState != ledState)
     {
         ledState = newState;
-        // Only repaint the header area (top 22px)
-        repaint (0, 0, getWidth(), 22);
+        repaint();  // Outline + accent stripe + LED all change with active state
+    }
+    else if (ledState && enableAttach != nullptr && enableToggle.getToggleState())
+    {
+        // While the LED is active, repaint the header so the breathing halo animates
+        repaint (0, 0, getWidth(), headerHeight + 4);
+    }
+}
+
+void ChannelStripComponent::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.getPosition().getY() >= headerHeight)
+        return;
+
+    if (e.getPosition().getX() < ledClickWidth)
+    {
+        // Toggle channel enable
+        if (enableAttach != nullptr)
+        {
+            enableToggle.setToggleState (! enableToggle.getToggleState(),
+                                          juce::sendNotification);
+            repaint();
+        }
+        return;
+    }
+
+    // Anywhere else in the header → toggle the details accordion
+    if (hasDetails)
+    {
+        detailsButton.setToggleState (! detailsButton.getToggleState(),
+                                       juce::sendNotification);
+        // detailsButton.onClick triggers resized() + repaint()
+    }
+}
+
+void ChannelStripComponent::mouseMove (const juce::MouseEvent& e)
+{
+    const bool wasOver = headerHovered;
+    headerHovered = (e.getPosition().getY() < headerHeight);
+    if (wasOver != headerHovered)
+        repaint (0, 0, getWidth(), headerHeight + 4);
+}
+
+void ChannelStripComponent::mouseExit (const juce::MouseEvent&)
+{
+    if (headerHovered)
+    {
+        headerHovered = false;
+        repaint (0, 0, getWidth(), headerHeight + 4);
     }
 }
 
@@ -467,9 +515,10 @@ void ChannelStripComponent::paint (juce::Graphics& g)
     using namespace cart::ui;
     auto bounds = getLocalBounds().toFloat().reduced (1.0f);
     const float cornerR = 5.0f;
+    const auto accentColour = isVrc6() ? Palette::vrc6Accent : Palette::primary;
+    const bool enabled = enableAttach != nullptr ? enableToggle.getToggleState() : true;
 
-    // Strip body — vertical gradient (top lighter so the accent stripe
-    // melts into the body instead of sitting on top of a flat panel)
+    // ─── Strip body (vertical gradient) ────────────────────────────────
     juce::ColourGradient bodyGrad (
         Palette::surfaceAlt.brighter (0.05f), 0.0f, bounds.getY(),
         Palette::surfaceAlt.darker (0.10f),   0.0f, bounds.getBottom(),
@@ -477,54 +526,107 @@ void ChannelStripComponent::paint (juce::Graphics& g)
     g.setGradientFill (bodyGrad);
     g.fillRoundedRectangle (bounds, cornerR);
 
-    // Outline — slightly stronger when activity LED is lit
+    // Outline — brighter when activity LED is lit
     g.setColour (ledState
-                    ? (isVrc6() ? Palette::vrc6Accent.withAlpha (0.55f)
-                                : Palette::primary.withAlpha (0.55f))
+                    ? accentColour.withAlpha (0.60f)
                     : Palette::outlineDim.withAlpha (0.5f));
     g.drawRoundedRectangle (bounds.reduced (0.25f), cornerR, 0.8f);
 
-    // Accent stripe at top — gradient fade from full accent down
+    // ─── Header (top headerHeight px) ─────────────────────────────────
+    g.saveState();
+    g.reduceClipRegion (bounds.toNearestIntEdges());
+
+    auto header = bounds.withHeight ((float) headerHeight);
+
+    // Header bg: brighten when hovered or details are open
+    if (headerHovered || detailsVisible)
     {
-        g.saveState();
-        g.reduceClipRegion (bounds.toNearestIntEdges());
-        const auto accentColour = isVrc6() ? Palette::vrc6Accent : Palette::primary;
-        // Stronger when active
-        const float baseAlpha = ledState ? 1.0f : 0.85f;
-        g.setColour (accentColour.withAlpha (baseAlpha));
-        g.fillRect (bounds.withHeight (2.0f));
-        // Soft glow trailing down
-        juce::ColourGradient glow (accentColour.withAlpha (ledState ? 0.22f : 0.10f),
-                                   bounds.getCentreX(), bounds.getY(),
-                                   accentColour.withAlpha (0.0f),
-                                   bounds.getCentreX(), bounds.getY() + 18.0f,
-                                   false);
-        g.setGradientFill (glow);
-        g.fillRect (bounds.withHeight (18.0f));
-        g.restoreState();
+        const float a = detailsVisible ? 0.65f : (headerHovered ? 0.40f : 0.0f);
+        g.setColour (Palette::surfaceHi.withAlpha (a));
+        g.fillRect (header);
     }
 
-    // Activity LED — small circle to the left of the name label
+    // Accent stripe BELOW the header — separates header from body
     {
-        auto nameBounds = nameLabel.getBounds();
-        float ledSize = 8.0f;
-        float ledX = static_cast<float> (nameBounds.getX()) - ledSize - 2.0f;
-        float ledY = static_cast<float> (nameBounds.getCentreY()) - ledSize * 0.5f;
+        const float baseAlpha = (enabled && ledState) ? 1.0f : (enabled ? 0.85f : 0.45f);
+        const float stripeY = header.getBottom();
+        g.setColour (accentColour.withAlpha (baseAlpha));
+        g.fillRect (bounds.getX(), stripeY - 1.0f, bounds.getWidth(), 2.0f);
 
-        if (ledState)
+        // Soft glow trailing down into the body
+        juce::ColourGradient glow (
+            accentColour.withAlpha (ledState ? 0.22f : 0.08f),
+            bounds.getCentreX(), stripeY,
+            accentColour.withAlpha (0.0f),
+            bounds.getCentreX(), stripeY + 14.0f,
+            false);
+        g.setGradientFill (glow);
+        g.fillRect (bounds.getX(), stripeY, bounds.getWidth(), 14.0f);
+    }
+
+    // ─── Header LED — toggles enable on click, breathes when active ───
+    {
+        const float ledSize = 12.0f;
+        const float ledX = header.getX() + (ledClickWidth - ledSize) * 0.5f + 4.0f;
+        const float ledY = header.getCentreY() - ledSize * 0.5f;
+        const auto ledBounds = juce::Rectangle<float> (ledX, ledY, ledSize, ledSize);
+
+        if (enabled)
         {
-            g.setColour (isVrc6() ? Colors::orangeAccent : Colors::accentActive);
-            g.fillEllipse (ledX, ledY, ledSize, ledSize);
-            // Glow effect
-            g.setColour ((isVrc6() ? Colors::orangeAccent : Colors::accentActive).withAlpha (0.3f));
-            g.fillEllipse (ledX - 2.0f, ledY - 2.0f, ledSize + 4.0f, ledSize + 4.0f);
+            // Breathing halo when channel is currently sounding
+            if (ledState)
+            {
+                const float t = (float) (juce::Time::getMillisecondCounter() % 3600) / 3600.0f;
+                const float breathe = 0.5f + 0.5f * std::sin (t * juce::MathConstants<float>::twoPi);
+                const float haloA  = 0.18f + 0.18f * breathe;
+                const float haloA2 = 0.30f + 0.14f * breathe;
+                g.setColour (accentColour.withAlpha (haloA));
+                g.fillEllipse (ledBounds.expanded (5.5f));
+                g.setColour (accentColour.withAlpha (haloA2));
+                g.fillEllipse (ledBounds.expanded (2.5f));
+            }
+            g.setColour (accentColour);
+            g.fillEllipse (ledBounds);
+            // Specular highlight
+            g.setColour (Palette::secondary.withAlpha (0.55f));
+            g.fillEllipse (ledBounds.getX() + ledSize * 0.18f,
+                           ledBounds.getY() + ledSize * 0.15f,
+                           ledSize * 0.32f, ledSize * 0.32f);
         }
         else
         {
-            g.setColour (Colors::knobOutline);
-            g.drawEllipse (ledX, ledY, ledSize, ledSize, 1.0f);
+            g.setColour (Palette::outline);
+            g.drawEllipse (ledBounds, 1.2f);
+            g.setColour (Palette::surface.darker (0.3f));
+            g.fillEllipse (ledBounds.reduced (1.2f));
         }
     }
+
+    // ─── Chevron at right of header — only if this channel has details ─
+    if (hasDetails)
+    {
+        const float chevR = 4.0f;
+        const float chevX = header.getRight() - 12.0f;
+        const float chevY = header.getCentreY();
+        juce::Path chev;
+        if (detailsVisible)
+        {
+            chev.addTriangle (chevX - chevR, chevY - chevR * 0.4f,
+                              chevX + chevR, chevY - chevR * 0.4f,
+                              chevX,         chevY + chevR * 0.6f);
+        }
+        else
+        {
+            chev.addTriangle (chevX - chevR * 0.4f, chevY - chevR,
+                              chevX - chevR * 0.4f, chevY + chevR,
+                              chevX + chevR * 0.6f, chevY);
+        }
+        g.setColour (detailsVisible ? accentColour
+                                    : (headerHovered ? Palette::secondary : Palette::textSecondary));
+        g.fillPath (chev);
+    }
+
+    g.restoreState();
 
     // Draw labels above controls
     g.setFont (juce::FontOptions (10.0f));
@@ -582,22 +684,21 @@ void ChannelStripComponent::paint (juce::Graphics& g)
 void ChannelStripComponent::resized()
 {
     auto area = getLocalBounds().reduced (3);
-    area.removeFromTop (2);  // accent stripe clearance
     const int pad = 3;
     const int sliderH = 22;
     const int labelH = 13;
 
-    // --- Layout top to bottom ---
+    // --- Header — replaces the old name row + enable row + details row ---
+    auto header = area.removeFromTop (headerHeight);
+    nameLabel.setBounds (header.reduced (ledClickWidth, 0).withTrimmedRight (16));
 
-    auto nameRow = area.removeFromTop (16);
-    nameLabel.setBounds (nameRow.withTrimmedLeft (14));  // Leave space for LED
-    area.removeFromTop (pad);
+    // Enable toggle + details button stay in the component tree (APVTS
+    // attachment + state) but are invisible — clicks come from mouseDown.
+    enableToggle.setBounds (0, 0, 0, 0);
+    detailsButton.setBounds (0, 0, 0, 0);
 
-    if (enableAttach != nullptr)
-    {
-        enableToggle.setBounds (area.removeFromTop (20));
-        area.removeFromTop (pad);
-    }
+    // 2px stripe + small gap before body controls
+    area.removeFromTop (6);
 
     // Main combo (if any)
     if (hasMainCombo)
@@ -642,19 +743,9 @@ void ChannelStripComponent::resized()
         area.removeFromTop (pad);
     }
 
-    // Details toggle + expandable area
+    // Details expandable area — toggle is now in the header chevron
     if (hasDetails)
     {
-        // Align Details button across all channel types.
-        // Pulse/Noise consume 160px before this point; pad shorter channels.
-        static constexpr int targetConsumed = 160;
-        int consumed = area.getY() - (getLocalBounds().reduced (3).getY());
-        if (consumed < targetConsumed)
-            area.removeFromTop (targetConsumed - consumed);
-
-        detailsButton.setBounds (area.removeFromTop (20).reduced (4, 0));
-        area.removeFromTop (pad);
-
         if (detailsVisible)
         {
             int detailH = juce::jmin (140, area.getHeight() - sliderH - labelH - pad);

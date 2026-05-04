@@ -29,6 +29,9 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
     void timerCallback() override;
 
     ChannelType getChannelType() const { return channelType; }
@@ -131,6 +134,11 @@ private:
     // Activity LED
     std::atomic<bool>* activityFlag = nullptr;
     bool ledState = false;
+
+    // Header click & hover state
+    bool headerHovered = false;
+    static constexpr int headerHeight = 38;
+    static constexpr int ledClickWidth = 32;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelStripComponent)
 };
