@@ -3,7 +3,7 @@
 #include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Colors.h"
+#include "Theme.h"
 
 namespace cart {
 
@@ -137,8 +137,8 @@ private:
 
     // Header click & hover state
     bool headerHovered = false;
-    static constexpr int headerHeight = 38;
-    static constexpr int ledClickWidth = 32;
+    static constexpr int headerHeight  = cart::ui::Metrics::channelHeaderHeight;
+    static constexpr int ledClickWidth = cart::ui::Metrics::channelHeaderLedHit;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelStripComponent)
 };

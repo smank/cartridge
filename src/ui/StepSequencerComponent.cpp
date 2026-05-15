@@ -17,10 +17,10 @@ StepSequencerComponent::StepSequencerComponent (CartridgeProcessor& proc)
     {
         channelButtons[i].setButtonText (channelNames[i]);
         channelButtons[i].setClickingTogglesState (false);
-        channelButtons[i].setColour (juce::TextButton::buttonColourId, Colors::bgMid);
-        channelButtons[i].setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
-        channelButtons[i].setColour (juce::TextButton::buttonOnColourId, Colors::accentActive);
-        channelButtons[i].setColour (juce::TextButton::textColourOnId, Colors::textPrimary);
+        channelButtons[i].setColour (juce::TextButton::buttonColourId, cart::ui::Palette::surface);
+        channelButtons[i].setColour (juce::TextButton::textColourOffId, cart::ui::Palette::textSecondary);
+        channelButtons[i].setColour (juce::TextButton::buttonOnColourId, cart::ui::Palette::primary);
+        channelButtons[i].setColour (juce::TextButton::textColourOnId, cart::ui::Palette::textPrimary);
         channelButtons[i].onClick = [this, i]
         {
             selectedChannel = i;
@@ -37,10 +37,10 @@ StepSequencerComponent::StepSequencerComponent (CartridgeProcessor& proc)
     {
         laneButtons[i].setButtonText (laneNames[i]);
         laneButtons[i].setClickingTogglesState (false);
-        laneButtons[i].setColour (juce::TextButton::buttonColourId, Colors::bgMid);
-        laneButtons[i].setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
-        laneButtons[i].setColour (juce::TextButton::buttonOnColourId, Colors::accentActive);
-        laneButtons[i].setColour (juce::TextButton::textColourOnId, Colors::textPrimary);
+        laneButtons[i].setColour (juce::TextButton::buttonColourId, cart::ui::Palette::surface);
+        laneButtons[i].setColour (juce::TextButton::textColourOffId, cart::ui::Palette::textSecondary);
+        laneButtons[i].setColour (juce::TextButton::buttonOnColourId, cart::ui::Palette::primary);
+        laneButtons[i].setColour (juce::TextButton::textColourOnId, cart::ui::Palette::textPrimary);
         laneButtons[i].onClick = [this, i]
         {
             selectedLane = i;
@@ -54,35 +54,35 @@ StepSequencerComponent::StepSequencerComponent (CartridgeProcessor& proc)
 
     // Loop toggle
     loopToggle.setButtonText ("Loop");
-    loopToggle.setColour (juce::ToggleButton::textColourId, Colors::textSecondary);
-    loopToggle.setColour (juce::ToggleButton::tickColourId, Colors::accentActive);
+    loopToggle.setColour (juce::ToggleButton::textColourId, cart::ui::Palette::textSecondary);
+    loopToggle.setColour (juce::ToggleButton::tickColourId, cart::ui::Palette::primary);
     loopToggle.setToggleState (false, juce::dontSendNotification);
     loopToggle.onClick = [this] { setLooping (loopToggle.getToggleState()); };
     addAndMakeVisible (loopToggle);
 
     // Clear button
     clearButton.setButtonText ("Clr");
-    clearButton.setColour (juce::TextButton::buttonColourId, Colors::bgMid);
-    clearButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    clearButton.setColour (juce::TextButton::buttonColourId, cart::ui::Palette::surface);
+    clearButton.setColour (juce::TextButton::textColourOffId, cart::ui::Palette::textSecondary);
     clearButton.setTooltip ("Clear all steps for this lane");
     clearButton.onClick = [this] { clearAllSteps(); };
     addAndMakeVisible (clearButton);
 
     // Step count: minus button, display, plus button
     stepCountMinus.setButtonText ("-");
-    stepCountMinus.setColour (juce::TextButton::buttonColourId, Colors::bgMid);
-    stepCountMinus.setColour (juce::TextButton::textColourOffId, Colors::textPrimary);
+    stepCountMinus.setColour (juce::TextButton::buttonColourId, cart::ui::Palette::surface);
+    stepCountMinus.setColour (juce::TextButton::textColourOffId, cart::ui::Palette::textPrimary);
     stepCountMinus.onClick = [this] { setStepCount (getStepCount() - 1); };
     addAndMakeVisible (stepCountMinus);
 
     stepCountPlus.setButtonText ("+");
-    stepCountPlus.setColour (juce::TextButton::buttonColourId, Colors::bgMid);
-    stepCountPlus.setColour (juce::TextButton::textColourOffId, Colors::textPrimary);
+    stepCountPlus.setColour (juce::TextButton::buttonColourId, cart::ui::Palette::surface);
+    stepCountPlus.setColour (juce::TextButton::textColourOffId, cart::ui::Palette::textPrimary);
     stepCountPlus.onClick = [this] { setStepCount (getStepCount() + 1); };
     addAndMakeVisible (stepCountPlus);
 
     stepCountDisplay.setFont (juce::FontOptions (11.0f));
-    stepCountDisplay.setColour (juce::Label::textColourId, Colors::textPrimary);
+    stepCountDisplay.setColour (juce::Label::textColourId, cart::ui::Palette::textPrimary);
     stepCountDisplay.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (stepCountDisplay);
 
@@ -326,11 +326,11 @@ void StepSequencerComponent::paint (juce::Graphics& g)
     float gridH = static_cast<float> (grid.getHeight());
 
     // Grid background
-    g.setColour (Colors::bgDark);
+    g.setColour (cart::ui::Palette::background);
     g.fillRect (grid);
 
     // Beat group markers (every 4 steps)
-    g.setColour (Colors::divider.withAlpha (0.15f));
+    g.setColour (cart::ui::Palette::outlineDim.withAlpha (0.15f));
     for (int i = 4; i < StepSequenceData::kMaxSteps; i += 4)
     {
         auto cell = getCellRect (i);
@@ -341,7 +341,7 @@ void StepSequencerComponent::paint (juce::Graphics& g)
     if (selectedLane == LANE_PITCH)
     {
         int centerY = grid.getCentreY();
-        g.setColour (Colors::textDark);
+        g.setColour (cart::ui::Palette::textDim);
         g.drawHorizontalLine (centerY, (float) grid.getX(), (float) grid.getRight());
     }
 
@@ -355,13 +355,13 @@ void StepSequencerComponent::paint (juce::Graphics& g)
         bool active = (i < numSteps);
 
         // Grid lines
-        g.setColour (Colors::divider.withAlpha (0.2f));
+        g.setColour (cart::ui::Palette::outlineDim.withAlpha (0.2f));
         g.drawVerticalLine (cell.getX(), (float) grid.getY(), (float) grid.getBottom());
 
         // Inactive steps — dimmed overlay
         if (!active)
         {
-            g.setColour (Colors::bgMid.withAlpha (0.6f));
+            g.setColour (cart::ui::Palette::surface.withAlpha (0.6f));
             g.fillRect (cell.reduced (1));
             continue;
         }
@@ -369,7 +369,7 @@ void StepSequencerComponent::paint (juce::Graphics& g)
         // Playback highlight
         if (i == playStep && channelPlaying)
         {
-            g.setColour (Colors::accentDim.withAlpha (0.5f));
+            g.setColour (cart::ui::Palette::primaryDim.withAlpha (0.5f));
             g.fillRect (cell.reduced (1));
         }
 
@@ -396,7 +396,7 @@ void StepSequencerComponent::paint (juce::Graphics& g)
                 else
                     barRect = { inner.getX(), centerY, inner.getWidth(), 1 };
 
-                g.setColour (value >= 0 ? Colors::accentActive : Colors::fxAccent);
+                g.setColour (value >= 0 ? cart::ui::Palette::primary : cart::ui::Palette::hot);
                 g.fillRect (barRect);
             }
             else
@@ -406,13 +406,13 @@ void StepSequencerComponent::paint (juce::Graphics& g)
                 int barH = juce::jmax (1, juce::roundToInt (norm * static_cast<float> (inner.getHeight())));
                 auto barRect = inner.withTop (inner.getBottom() - barH);
 
-                g.setColour (Colors::accentActive);
+                g.setColour (cart::ui::Palette::primary);
                 g.fillRect (barRect);
             }
         }
 
         // Value text — draw at top for unipolar, above/below bar for pitch
-        g.setColour (Colors::textPrimary.withAlpha (0.8f));
+        g.setColour (cart::ui::Palette::textPrimary.withAlpha (0.8f));
         g.setFont (juce::FontOptions (9.0f));
         if (selectedLane == LANE_PITCH && value != 0)
         {
@@ -426,14 +426,14 @@ void StepSequencerComponent::paint (juce::Graphics& g)
     }
 
     // Outer border
-    g.setColour (Colors::divider);
+    g.setColour (cart::ui::Palette::outlineDim);
     g.drawRect (grid);
 
     // Loop indicator: small arrow from end back to start
     if (isLooping() && numSteps > 0)
     {
         auto lastCell = getCellRect (numSteps - 1);
-        g.setColour (Colors::accentActive.withAlpha (0.6f));
+        g.setColour (cart::ui::Palette::primary.withAlpha (0.6f));
         int y = grid.getBottom() + 1;
         g.drawArrow (juce::Line<float> ((float) lastCell.getCentreX(), (float) y,
                                          (float) getCellRect (0).getCentreX(), (float) y),

@@ -79,7 +79,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
             juce::DialogWindow::LaunchOptions o;
             o.content.setOwned (content.release());
             o.dialogTitle = "Audio/MIDI Settings";
-            o.dialogBackgroundColour = cart::Colors::bgMid;
+            o.dialogBackgroundColour = cart::ui::Palette::surface;
             o.escapeKeyTriggersCloseButton = true;
             o.useNativeTitleBar = true;
             o.resizable = false;
@@ -117,21 +117,21 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
     // Style the keyboard
     keyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId,
-                        cart::Colors::keyWhite);
+                        cart::ui::Palette::keyWhite);
     keyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId,
-                        cart::Colors::keyBlack);
+                        cart::ui::Palette::keyBlack);
     keyboard.setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId,
-                        cart::Colors::bgDark);
+                        cart::ui::Palette::background);
     keyboard.setColour (juce::MidiKeyboardComponent::keyDownOverlayColourId,
-                        cart::Colors::keyDown.withAlpha (0.6f));
+                        cart::ui::Palette::keyDown.withAlpha (0.6f));
     keyboard.setColour (juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId,
-                        cart::Colors::accentDim.withAlpha (0.3f));
+                        cart::ui::Palette::primaryDim.withAlpha (0.3f));
     keyboard.setColour (juce::MidiKeyboardComponent::shadowColourId,
-                        cart::Colors::bgDark);
+                        cart::ui::Palette::background);
     keyboard.setColour (juce::MidiKeyboardComponent::upDownButtonBackgroundColourId,
-                        cart::Colors::bgMid);
+                        cart::ui::Palette::surface);
     keyboard.setColour (juce::MidiKeyboardComponent::upDownButtonArrowColourId,
-                        cart::Colors::textPrimary);
+                        cart::ui::Palette::textPrimary);
     keyboard.setKeyWidth (24.0f);
     keyboard.setMidiChannel (1);
     keyboard.setAvailableRange (36, 96); // C2 to C7 (~5 octaves)
@@ -193,7 +193,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
         if (auto* docWindow = dynamic_cast<juce::DocumentWindow*> (safeThis->getTopLevelComponent()))
         {
             docWindow->setColour (juce::ResizableWindow::backgroundColourId,
-                                  cart::Colors::bgDark);
+                                  cart::ui::Palette::background);
             docWindow->setUsingNativeTitleBar (true);
 
             if (auto* peer = docWindow->getPeer())

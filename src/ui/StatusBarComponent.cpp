@@ -3,14 +3,16 @@
 
 namespace cart {
 
+using namespace cart::ui;
+
 StatusBarComponent::StatusBarComponent (CartridgeProcessor& processor)
     : processorRef (processor)
 {
     setOpaque (true);
 
     holdToggle.setButtonText ("HOLD");
-    holdToggle.setColour (juce::ToggleButton::textColourId, Colors::textSecondary);
-    holdToggle.setColour (juce::ToggleButton::tickColourId, Colors::fxBright);
+    holdToggle.setColour (juce::ToggleButton::textColourId, Palette::textSecondary);
+    holdToggle.setColour (juce::ToggleButton::tickColourId, Palette::hotBright);
     holdToggle.onClick = [this]
     {
         processorRef.setHoldMode (holdToggle.getToggleState());
@@ -18,8 +20,8 @@ StatusBarComponent::StatusBarComponent (CartridgeProcessor& processor)
     addAndMakeVisible (holdToggle);
 
     versionLabel.setText ("v" JucePlugin_VersionString, juce::dontSendNotification);
-    versionLabel.setFont (juce::FontOptions (11.0f));
-    versionLabel.setColour (juce::Label::textColourId, Colors::textDark);
+    versionLabel.setFont (labelFont (Metrics::fontValue));
+    versionLabel.setColour (juce::Label::textColourId, Palette::textDim);
     versionLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (versionLabel);
 
@@ -41,7 +43,6 @@ void StatusBarComponent::resized()
 
 void StatusBarComponent::paint (juce::Graphics& g)
 {
-    using namespace cart::ui;
     auto area = getLocalBounds();
 
     // Subtle vertical gradient — slightly darker than the editor body
@@ -55,7 +56,7 @@ void StatusBarComponent::paint (juce::Graphics& g)
     g.setColour (Palette::primary.withAlpha (0.35f));
     g.fillRect (area.removeFromTop (1));
 
-    auto font = juce::Font (juce::FontOptions (12.0f));
+    auto font = labelFont (Metrics::fontValue);
     g.setFont (font);
 
     float baseline = area.getY() + (area.getHeight() + font.getAscent() - font.getDescent()) * 0.5f;
@@ -72,7 +73,7 @@ void StatusBarComponent::paint (juce::Graphics& g)
 
     auto drawSep = [&] ()
     {
-        drawRun ("  \xc2\xb7  ", Colors::textDark);  // centered dot separator
+        drawRun ("  \xc2\xb7  ", Palette::textDim);  // centered dot separator
     };
 
     // Active voices
@@ -83,14 +84,14 @@ void StatusBarComponent::paint (juce::Graphics& g)
 
     if (activeCount > 0)
     {
-        drawRun (juce::String (activeCount) + " voice" + (activeCount > 1 ? "s" : ""), Colors::accentActive);
+        drawRun (juce::String (activeCount) + " voice" + (activeCount > 1 ? "s" : ""), Palette::primary);
         drawSep();
     }
 
     // Engine mode
     auto* engineParam = processorRef.getApvts().getRawParameterValue (cart::ParamIDs::EngineMode);
     bool modern = engineParam && static_cast<int> (engineParam->load()) == 1;
-    drawRun (modern ? "Modern" : "Classic", Colors::textPrimary);
+    drawRun (modern ? "Modern" : "Classic", Palette::textPrimary);
     drawSep();
 
     // MIDI mode
@@ -99,22 +100,22 @@ void StatusBarComponent::paint (juce::Graphics& g)
     {
         static const char* modeNames[] = { "Split", "Auto", "Mono", "Layer" };
         int mode = juce::jlimit (0, 3, static_cast<int> (midiParam->load()));
-        drawRun (modeNames[mode], Colors::textSecondary);
+        drawRun (modeNames[mode], Palette::textSecondary);
         drawSep();
     }
 
     // Octave
-    drawRun ("C" + juce::String (4 + currentOctOffset), Colors::textPrimary);
+    drawRun ("C" + juce::String (4 + currentOctOffset), Palette::textPrimary);
     drawSep();
 
     // Velocity
-    drawRun (juce::String (juce::roundToInt (currentVelocity * 100.0f)) + "%", Colors::textSecondary);
+    drawRun (juce::String (juce::roundToInt (currentVelocity * 100.0f)) + "%", Palette::textSecondary);
 
     // Sustain pedal indicator
     if (processorRef.getSustainPedal())
     {
         drawSep();
-        drawRun ("SUS", Colors::orangeAccent);
+        drawRun ("SUS", Palette::vrc6Accent);
     }
 }
 

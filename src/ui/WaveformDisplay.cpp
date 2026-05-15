@@ -3,6 +3,8 @@
 
 namespace cart {
 
+using namespace cart::ui;
+
 WaveformDisplay::WaveformDisplay (WaveformBuffer& buffer)
     : waveformBuffer (buffer)
 {
@@ -28,9 +30,9 @@ void WaveformDisplay::paint (juce::Graphics& g)
 
     // Inset scope panel — radial gradient gives it depth like an oscilloscope tube
     juce::ColourGradient bgGrad (
-        Palette::background.brighter (0.10f),
+        Palette::waveGlow.withAlpha (0.18f),
         bounds.getCentreX(), bounds.getCentreY(),
-        Palette::background.darker (0.30f),
+        Palette::waveDark.withAlpha (0.95f),
         bounds.getRight(), bounds.getBottom(),
         true);
     g.setGradientFill (bgGrad);

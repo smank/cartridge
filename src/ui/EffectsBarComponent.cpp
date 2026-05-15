@@ -3,25 +3,34 @@
 
 namespace cart {
 
+using namespace cart::ui;
+
 namespace
 {
     void makeKnobLabel (juce::Label& label, const juce::String& text)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setFont (juce::FontOptions (11.0f));
-        label.setColour (juce::Label::textColourId, Colors::textSecondary);
+        label.setFont (labelFont (Metrics::fontValue));
+        label.setColour (juce::Label::textColourId, Palette::textSecondary);
         label.setJustificationType (juce::Justification::centred);
     }
+}
+
+void EffectsBarComponent::configureLedToggle (juce::ToggleButton& toggle, const juce::String& tooltip)
+{
+    toggle.setClickingTogglesState (true);
+    toggle.setLookAndFeel (&invisibleToggleLaf);
+    toggle.setWantsKeyboardFocus (true);
+    toggle.setTooltip (tooltip);
+    addAndMakeVisible (toggle);
 }
 
 EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& apvts)
 {
     // ─── BitCrush ──────────────────────────────────────────────────────
-    bcEnable.setClickingTogglesState (true);
-    addAndMakeVisible (bcEnable);
+    configureLedToggle (bcEnable, "Enable BitCrush");
     bcEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::BcEnabled, bcEnable);
-    bcEnable.setSize (0, 0); // invisible; we draw LED manually
 
     styleKnob (bcBitDepth);
     bcBitDepth.setTooltip ("Bit depth reduction (lower = crunchier)");
@@ -48,17 +57,12 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (bcMixLabel);
 
     // ─── Filter ────────────────────────────────────────────────────────
-    fltEnable.setClickingTogglesState (true);
-    addAndMakeVisible (fltEnable);
+    configureLedToggle (fltEnable, "Enable Filter");
     fltEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::FltEnabled, fltEnable);
-    fltEnable.setSize (0, 0);
 
     fltType.addItemList ({ "LP", "BP", "HP" }, 1);
     fltType.setTooltip ("Filter type: Low-pass, Band-pass, High-pass");
-    fltType.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    fltType.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    fltType.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     addChildComponent (fltType);
     fltTypeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::FltType, fltType);
@@ -82,11 +86,9 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (fltResonanceLabel);
 
     // ─── Chorus ────────────────────────────────────────────────────────
-    chEnable.setClickingTogglesState (true);
-    addAndMakeVisible (chEnable);
+    configureLedToggle (chEnable, "Enable Chorus");
     chEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::ChEnabled, chEnable);
-    chEnable.setSize (0, 0);
 
     styleKnob (chRate);
     chRate.setTooltip ("Chorus modulation rate");
@@ -113,11 +115,9 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     addChildComponent (chMixLabel);
 
     // ─── Delay ─────────────────────────────────────────────────────────
-    dlEnable.setClickingTogglesState (true);
-    addAndMakeVisible (dlEnable);
+    configureLedToggle (dlEnable, "Enable Delay");
     dlEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::DlEnabled, dlEnable);
-    dlEnable.setSize (0, 0);
 
     styleKnob (dlTime);
     dlTime.setTooltip ("Delay time in milliseconds");
@@ -143,30 +143,25 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
     makeKnobLabel (dlMixLabel, "Mix");
     addChildComponent (dlMixLabel);
 
-    // Delay tempo sync
+    // Delay tempo sync — this is a visible labelled pill, not an LED, so it
+    // keeps the global LookAndFeel and a deliberate tick-colour override.
     dlSyncToggle.setButtonText ("Sync");
-    dlSyncToggle.setColour (juce::ToggleButton::textColourId, Colors::textSecondary);
-    dlSyncToggle.setColour (juce::ToggleButton::tickColourId, Colors::fxAccent);
+    dlSyncToggle.setColour (juce::ToggleButton::tickColourId, Palette::hot);
     dlSyncToggle.setTooltip ("Sync delay time to host tempo");
     addChildComponent (dlSyncToggle);
     dlSyncAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::DlSyncEnabled, dlSyncToggle);
 
     dlSyncDiv.addItemList ({ "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/4T", "1/8T", "1/16T" }, 1);
-    dlSyncDiv.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    dlSyncDiv.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    dlSyncDiv.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     dlSyncDiv.setTooltip ("Delay tempo sync note division");
     addChildComponent (dlSyncDiv);
     dlSyncDivAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::DlSyncDiv, dlSyncDiv);
 
     // ─── Reverb ────────────────────────────────────────────────────────
-    rvEnable.setClickingTogglesState (true);
-    addAndMakeVisible (rvEnable);
+    configureLedToggle (rvEnable, "Enable Reverb");
     rvEnableAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::RvEnabled, rvEnable);
-    rvEnable.setSize (0, 0);
 
     styleKnob (rvSize);
     rvSize.setTooltip ("Reverb room size");
@@ -206,6 +201,10 @@ EffectsBarComponent::EffectsBarComponent (juce::AudioProcessorValueTreeState& ap
 EffectsBarComponent::~EffectsBarComponent()
 {
     stopTimer();
+
+    // Detach our custom LnF before the toggles are destroyed.
+    for (auto* t : { &bcEnable, &fltEnable, &chEnable, &dlEnable, &rvEnable })
+        t->setLookAndFeel (nullptr);
 }
 
 void EffectsBarComponent::timerCallback()
@@ -303,25 +302,14 @@ void EffectsBarComponent::mouseDown (const juce::MouseEvent& e)
     int sectionW = getWidth() / NUM_FX;
     int fxIndex = juce::jmin (pos.getX() / sectionW, (int) NUM_FX - 1);
 
-    // Check if click is on the LED area (left 36px of section)
-    int localX = pos.getX() - fxIndex * sectionW;
-    if (localX < 36)
-    {
-        // Toggle the enable button for this effect
-        juce::ToggleButton* enableButtons[] = { &bcEnable, &fltEnable, &chEnable, &dlEnable, &rvEnable };
-        enableButtons[fxIndex]->setToggleState (! enableButtons[fxIndex]->getToggleState(),
-                                                 juce::sendNotification);
-        repaint();
-        return;
-    }
-
-    // Click elsewhere in header → expand/collapse
+    // LED hits are handled by the (now real-sized, transparent) toggle
+    // buttons themselves, so any header click outside their bounds expands
+    // or collapses the section.
     toggleExpand (fxIndex);
 }
 
 void EffectsBarComponent::paint (juce::Graphics& g)
 {
-    using namespace cart::ui;
     auto bounds = getLocalBounds();
     int sectionW = bounds.getWidth() / NUM_FX;
 
@@ -363,8 +351,11 @@ void EffectsBarComponent::paint (juce::Graphics& g)
         }
 
         // ─── LED — bigger, with breathing glow when on ─────────────────
+        // Centred inside the toggle button's bounds (see resized()).
         const float ledSize = 12.0f;
-        auto ledBounds = section.withWidth (36).withSizeKeepingCentre ((int) ledSize, (int) ledSize).toFloat();
+        auto ledBounds = section.withWidth (Metrics::channelHeaderLedHit)
+                                .withSizeKeepingCentre ((int) ledSize, (int) ledSize)
+                                .toFloat();
         if (enabled)
         {
             // Slow breathing on the halo so active effects feel "alive"
@@ -393,9 +384,10 @@ void EffectsBarComponent::paint (juce::Graphics& g)
         }
 
         // Section name
-        const auto textArea = section.withTrimmedLeft (36).withTrimmedRight (24);
+        const auto textArea = section.withTrimmedLeft (Metrics::channelHeaderLedHit + 4)
+                                     .withTrimmedRight (24);
         g.setColour (enabled ? Palette::textPrimary : Palette::textSecondary);
-        g.setFont (displayFont (12.0f));
+        g.setFont (displayFont (Metrics::fontLabelSmall));
         g.drawText (fxNames[i], textArea, juce::Justification::centredLeft);
 
         // Chevron — points down when expanded, right when collapsed
@@ -553,12 +545,24 @@ void EffectsBarComponent::layoutDetailKnobs (juce::Rectangle<int> area, int fxIn
 
 void EffectsBarComponent::resized()
 {
-    // Enable buttons are invisible but need valid bounds for APVTS attachment
-    bcEnable.setBounds (0, 0, 0, 0);
-    fltEnable.setBounds (0, 0, 0, 0);
-    chEnable.setBounds (0, 0, 0, 0);
-    dlEnable.setBounds (0, 0, 0, 0);
-    rvEnable.setBounds (0, 0, 0, 0);
+    // Position each enable toggle directly over its painted LED so keyboard
+    // and screen-reader users can reach it, and so the LED's full hit zone
+    // (not just the 12px circle) responds to clicks. The toggle itself
+    // paints nothing — see InvisibleToggleLAF.
+    const int sectionW = juce::jmax (1, getWidth() / NUM_FX);
+    const int hit = Metrics::channelHeaderLedHit;
+    const int hitY = (headerHeight - hit) / 2;
+
+    juce::ToggleButton* enableButtons[] = { &bcEnable, &fltEnable, &chEnable, &dlEnable, &rvEnable };
+    for (int i = 0; i < NUM_FX; ++i)
+    {
+        // The LED is painted inside the leftmost 32px of each section,
+        // horizontally centred. Match that here so the toggle bounds frame
+        // the LED exactly.
+        const int sectionX = i * sectionW;
+        const int hitX = sectionX + (Metrics::channelHeaderLedHit - hit) / 2;
+        enableButtons[i]->setBounds (hitX, hitY, hit, hit);
+    }
 
     if (expandedEffect >= 0)
     {

@@ -4,21 +4,18 @@
 
 namespace cart {
 
+using namespace cart::ui;
+
 ModernPanelComponent::ModernPanelComponent (juce::AudioProcessorValueTreeState& apvts)
 {
     // ─── Osc A ──────────────────────────────────────────────────────────
     oscAToggle.setButtonText ("A");
-    oscAToggle.setColour (juce::ToggleButton::textColourId, Colors::textPrimary);
-    oscAToggle.setColour (juce::ToggleButton::tickColourId, Colors::accentActive);
     addAndMakeVisible (oscAToggle);
     oscAToggleAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::ModOscAEnabled, oscAToggle);
 
     waveformCombo.addItemList ({ "Pulse 25%", "Pulse 50%", "Pulse 75%", "Pulse 12.5%",
                                  "Triangle", "Sawtooth", "Noise" }, 1);
-    waveformCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    waveformCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    waveformCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     addAndMakeVisible (waveformCombo);
     waveformAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::ModWaveform, waveformCombo);
@@ -26,17 +23,12 @@ ModernPanelComponent::ModernPanelComponent (juce::AudioProcessorValueTreeState& 
 
     // ─── Osc B ──────────────────────────────────────────────────────────
     oscBToggle.setButtonText ("B");
-    oscBToggle.setColour (juce::ToggleButton::textColourId, Colors::textPrimary);
-    oscBToggle.setColour (juce::ToggleButton::tickColourId, Colors::accentActive);
     addAndMakeVisible (oscBToggle);
     oscBToggleAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::ModOscBEnabled, oscBToggle);
 
     waveformBCombo.addItemList ({ "Pulse 25%", "Pulse 50%", "Pulse 75%", "Pulse 12.5%",
                                   "Triangle", "Sawtooth", "Noise" }, 1);
-    waveformBCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    waveformBCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    waveformBCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     addAndMakeVisible (waveformBCombo);
     waveformBAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::ModWaveformB, waveformBCombo);
@@ -101,8 +93,6 @@ ModernPanelComponent::ModernPanelComponent (juce::AudioProcessorValueTreeState& 
 
     // ─── Portamento ─────────────────────────────────────────────────────
     portaToggle.setButtonText ("Porta");
-    portaToggle.setColour (juce::ToggleButton::textColourId, Colors::textPrimary);
-    portaToggle.setColour (juce::ToggleButton::tickColourId, Colors::accentActive);
     addAndMakeVisible (portaToggle);
     portaToggleAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, ParamIDs::ModPortaEnabled, portaToggle);
@@ -134,15 +124,15 @@ void ModernPanelComponent::styleKnob (juce::Slider& knob)
     knob.setRotaryParameters (juce::MathConstants<float>::pi * 1.2f,
                               juce::MathConstants<float>::pi * 2.8f,
                               true);
-    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 56, 14);
+    knob.setTextBoxStyle (juce::Slider::TextBoxBelow, false, Metrics::rotaryKnobDiameter, 14);
     knob.setPopupMenuEnabled (true);
 }
 
 void ModernPanelComponent::makeLabel (juce::Label& label, const juce::String& text)
 {
     label.setText (text, juce::dontSendNotification);
-    label.setFont (juce::FontOptions (12.0f));
-    label.setColour (juce::Label::textColourId, Colors::textSecondary);
+    label.setFont (labelFont (Metrics::fontLabelSmall));
+    label.setColour (juce::Label::textColourId, Palette::textSecondary);
     label.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (label);
 }
@@ -221,7 +211,7 @@ void ModernPanelComponent::paint (juce::Graphics& g)
             float divX = sb.getX() + std::floor (sb.getWidth() * 0.5f);
 
             g.setColour (Palette::textPrimary);
-            g.setFont (displayFont (12.0f));
+            g.setFont (displayFont (Metrics::fontLabelSmall));
             g.drawText ("OSC A",
                         juce::Rectangle<float> (sb.getX() + p, labelY, divX - sb.getX() - p, (float) headerH),
                         juce::Justification::centredLeft);
@@ -237,7 +227,7 @@ void ModernPanelComponent::paint (juce::Graphics& g)
         else
         {
             g.setColour (Palette::textPrimary);
-            g.setFont (displayFont (12.0f));
+            g.setFont (displayFont (Metrics::fontLabelSmall));
             g.drawText (sectionNames[i],
                         juce::Rectangle<float> (sb.getX() + p, labelY, sb.getWidth() - 2.0f * p, (float) headerH),
                         juce::Justification::centredLeft);

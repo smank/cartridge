@@ -3,6 +3,8 @@
 
 namespace cart {
 
+using namespace cart::ui;
+
 namespace
 {
     // Horizontal sliders for narrow rows (transpose, sweep, linear counter)
@@ -33,10 +35,10 @@ namespace
     }
 
     void styleLabel (juce::Label& label, const juce::String& text, float fontSize,
-                     juce::Colour colour = Colors::textPrimary)
+                     juce::Colour colour = Palette::textPrimary)
     {
         label.setText (text, juce::dontSendNotification);
-        label.setFont (juce::FontOptions (fontSize));
+        label.setFont (labelFont (fontSize));
         label.setColour (juce::Label::textColourId, colour);
         label.setJustificationType (juce::Justification::centred);
     }
@@ -62,9 +64,9 @@ ChannelStripComponent::ChannelStripComponent (ChannelType type,
                                               juce::AudioProcessorValueTreeState& apvts)
     : channelType (type)
 {
-    auto nameColour = isVrc6() ? Colors::orangeAccent : Colors::accentActive;
+    auto nameColour = isVrc6() ? Palette::vrc6Accent : Palette::primary;
     nameLabel.setText (getChannelName (type), juce::dontSendNotification);
-    nameLabel.setFont (cart::ui::displayFont (13.0f));
+    nameLabel.setFont (displayFont (Metrics::fontHeading));
     nameLabel.setColour (juce::Label::textColourId, nameColour);
     nameLabel.setJustificationType (juce::Justification::centred);
     nameLabel.setInterceptsMouseClicks (false, false);
@@ -216,9 +218,6 @@ void ChannelStripComponent::setupPulseControls (const juce::String& prefix,
     mainCombo.addItem ("25%", 2);
     mainCombo.addItem ("50%", 3);
     mainCombo.addItem ("75%", 4);
-    mainCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    mainCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    mainCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     mainCombo.setTooltip ("Pulse wave duty cycle (12.5%, 25%, 50%, 75%)");
     addAndMakeVisible (mainCombo);
     mainComboAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
@@ -299,7 +298,7 @@ void ChannelStripComponent::setupTriangleControls (juce::AudioProcessorValueTree
     // No main combo or knob — just a label
     hasMainCombo = false;
     hasMainKnob = false;
-    styleLabel (mainLabel, "32-Step", 11.0f, Colors::textSecondary);
+    styleLabel (mainLabel, "32-Step", Metrics::fontValue, Palette::textSecondary);
     addAndMakeVisible (mainLabel);
 
     // Transpose knob
@@ -313,7 +312,7 @@ void ChannelStripComponent::setupTriangleControls (juce::AudioProcessorValueTree
 
     // No volume knob — fixed volume
     hasVolume = false;
-    styleLabel (volumeLabel, "Fixed", 11.0f, Colors::textSecondary);
+    styleLabel (volumeLabel, "Fixed", Metrics::fontValue, Palette::textSecondary);
     addAndMakeVisible (volumeLabel);
 
     // Details (linear counter)
@@ -351,9 +350,6 @@ void ChannelStripComponent::setupNoiseControls (juce::AudioProcessorValueTreeSta
     hasMainCombo = true;
     mainCombo.addItem ("Long", 1);
     mainCombo.addItem ("Short", 2);
-    mainCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    mainCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    mainCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     mainCombo.setTooltip ("Short = metallic/pitched, Long = white noise");
     addAndMakeVisible (mainCombo);
     mainComboAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
@@ -417,7 +413,7 @@ void ChannelStripComponent::setupDpcmControls (juce::AudioProcessorValueTreeStat
 
     // No volume — fixed
     hasVolume = false;
-    styleLabel (volumeLabel, "Fixed", 11.0f, Colors::textSecondary);
+    styleLabel (volumeLabel, "Fixed", Metrics::fontValue, Palette::textSecondary);
     addAndMakeVisible (volumeLabel);
 
     // Details (loop toggle)
@@ -509,7 +505,7 @@ void ChannelStripComponent::setupVrc6SawControls (juce::AudioProcessorValueTreeS
 
     // No volume — fixed
     hasVolume = false;
-    styleLabel (volumeLabel, "Fixed", 11.0f, Colors::textSecondary);
+    styleLabel (volumeLabel, "Fixed", Metrics::fontValue, Palette::textSecondary);
     addAndMakeVisible (volumeLabel);
 
     // No details
@@ -639,8 +635,8 @@ void ChannelStripComponent::paint (juce::Graphics& g)
     g.restoreState();
 
     // Draw labels above controls
-    g.setFont (juce::FontOptions (10.0f));
-    g.setColour (Colors::textSecondary);
+    g.setFont (labelFont (Metrics::fontTiny));
+    g.setColour (Palette::textSecondary);
 
     auto drawLabel = [&] (const juce::String& text, const juce::Component& comp)
     {
@@ -695,10 +691,10 @@ void ChannelStripComponent::resized()
 {
     auto area = getLocalBounds().reduced (3);
     const int pad = 3;
-    const int sliderH = 22;
+    const int sliderH = Metrics::sliderHeight;
     const int labelH = 13;
-    const int comboH = 24;
-    const int minRotaryH = 56;
+    const int comboH = Metrics::comboHeight;
+    const int minRotaryH = Metrics::rotaryKnobDiameter;
     const int maxRotaryH = 120;
 
     // ─── Header (replaces the old name row + enable row + details row) ─
@@ -723,7 +719,7 @@ void ChannelStripComponent::resized()
     juce::Rectangle<int> detailArea;
     if (hasDetails && detailsVisible)
     {
-        const int detailH = juce::jmin (140, juce::jmax (0, area.getHeight() / 2));
+        const int detailH = juce::jmin (Metrics::accordionDetailHeight, juce::jmax (0, area.getHeight() / 2));
         detailArea = area.removeFromBottom (detailH);
         area.removeFromBottom (pad);
     }

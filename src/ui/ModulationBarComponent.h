@@ -2,7 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Colors.h"
+#include "Theme.h"
 #include "StepSequencerComponent.h"
 
 class CartridgeProcessor;
@@ -37,10 +37,23 @@ private:
 
     static constexpr int seqDetailHeight = 140;
 
+    // LookAndFeel that paints nothing — used for the LED toggle buttons in
+    // section headers. The painted LED comes from this component's paint(),
+    // so the toggle itself only needs to provide hit testing and focus.
+    struct InvisibleToggleLAF : juce::LookAndFeel_V4
+    {
+        void drawToggleButton (juce::Graphics&, juce::ToggleButton&,
+                               bool /*shouldDrawButtonAsHighlighted*/,
+                               bool /*shouldDrawButtonAsDown*/) override {}
+    };
+
     void toggleExpand (int modIndex);
     void styleKnob (juce::Slider& knob);
     void layoutDetailKnobs (juce::Rectangle<int> area, int modIndex);
     void setDetailVisible (int modIndex, bool visible);
+    void configureLedToggle (juce::ToggleButton& toggle, const juce::String& tooltipText);
+
+    InvisibleToggleLAF invisibleToggleLaf;
 
     int expandedMod = -1;
     int hoveredSection = -1;

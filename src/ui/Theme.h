@@ -47,6 +47,10 @@ namespace Palette
     inline const juce::Colour keyWhite      { 0xFFE8E4DF };
     inline const juce::Colour keyBlack      { 0xFF181818 };
     inline const juce::Colour keyDown       { 0xFFB82030 };
+
+    // Waveform glow — used by WaveformDisplay's radial gradient
+    inline const juce::Colour waveGlow      { 0xFFFF4858 };
+    inline const juce::Colour waveDark      { 0xFF200810 };
 }
 
 namespace Metrics
@@ -68,6 +72,23 @@ namespace Metrics
     constexpr float outlineWidth      = 1.0f;
 
     constexpr int hitTargetMin        = 32;
+
+    // Channel strip & accordion layout
+    constexpr int channelHeaderHeight   = 38;
+    constexpr int channelHeaderLedHit   = 32;
+    constexpr int accordionDetailHeight = 140;
+
+    // Common control dimensions used by strips and bars
+    constexpr int sliderHeight          = 22;
+    constexpr int comboHeight           = 24;
+    constexpr int rotaryKnobDiameter    = 56;
+
+    // Typography (px heights consumed by Theme.h's font helpers)
+    constexpr float fontHeading         = 13.0f;
+    constexpr float fontLabel           = 13.0f;
+    constexpr float fontLabelSmall      = 12.0f;
+    constexpr float fontValue           = 11.0f;
+    constexpr float fontTiny            = 10.0f;
 }
 
 inline juce::Font displayFont (float size)

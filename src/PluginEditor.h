@@ -9,7 +9,7 @@
 #include "ui/StatusBarComponent.h"
 #include "ui/ModernPanelComponent.h"
 #include "ui/WaveformDisplay.h"
-#include "ui/Colors.h"
+#include "ui/Theme.h"
 #include "ui/CartridgeLookAndFeel.h"
 #include "ui/FullscreenHelper.h"
 

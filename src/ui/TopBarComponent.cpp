@@ -4,14 +4,16 @@
 
 namespace cart {
 
+using namespace cart::ui;
+
 TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
                                   juce::AudioProcessorValueTreeState& apvts)
     : processorRef (processor), apvtsRef (apvts)
 {
     // ─── Preset Combo ────────────────────────────────────────────────────
-    presetCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    presetCombo.setColour (juce::ComboBox::textColourId, Colors::fxBright);
-    presetCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    // Preset combo gets a hot-tinted text accent (everything else is left
+    // to the global LookAndFeel).
+    presetCombo.setColour (juce::ComboBox::textColourId, Palette::hotBright);
     populatePresets();
     presetCombo.onChange = [this] { selectPreset (presetCombo.getSelectedId() - 1); };
     presetCombo.setTooltip ("Select preset (Left/Right arrows to navigate)");
@@ -20,8 +22,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // Prev/Next buttons
     auto styleBtn = [] (juce::TextButton& btn)
     {
-        btn.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
-        btn.setColour (juce::TextButton::textColourOffId, Colors::textPrimary);
+        btn.setColour (juce::TextButton::buttonColourId, Palette::surfaceHi);
+        btn.setColour (juce::TextButton::textColourOffId, Palette::textPrimary);
     };
     styleBtn (prevButton);
     styleBtn (nextButton);
@@ -43,9 +45,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         dlg->addButton ("Cancel", 0);
 
         // Style the alert window
-        dlg->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
-        dlg->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
-        dlg->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
+        dlg->setColour (juce::AlertWindow::backgroundColourId, Palette::surface);
+        dlg->setColour (juce::AlertWindow::textColourId, Palette::textPrimary);
+        dlg->setColour (juce::AlertWindow::outlineColourId, Palette::outline);
 
         dlg->enterModalState (true, juce::ModalCallbackFunction::create (
             [this] (int result)
@@ -174,9 +176,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
             juce::MessageBoxIconType::WarningIcon);
         dlg->addButton ("Delete", 1);
         dlg->addButton ("Cancel", 0);
-        dlg->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
-        dlg->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
-        dlg->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
+        dlg->setColour (juce::AlertWindow::backgroundColourId, Palette::surface);
+        dlg->setColour (juce::AlertWindow::textColourId, Palette::textPrimary);
+        dlg->setColour (juce::AlertWindow::outlineColourId, Palette::outline);
 
         dlg->enterModalState (true, juce::ModalCallbackFunction::create (
             [this, idx] (int result)
@@ -192,8 +194,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     addAndMakeVisible (deleteButton);
 
     // Panic button
-    panicButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
-    panicButton.setColour (juce::TextButton::textColourOffId, Colors::fxBright);
+    panicButton.setColour (juce::TextButton::buttonColourId, Palette::surfaceHi);
+    panicButton.setColour (juce::TextButton::textColourOffId, Palette::hotBright);
     panicButton.onClick = [this] { processorRef.getKeyboardState().allNotesOff (0); };
     panicButton.setTooltip ("Stop all notes (Space)");
     addAndMakeVisible (panicButton);
@@ -209,8 +211,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::MasterVolume, masterVolSlider);
 
     masterVolLabel.setText ("Vol", juce::dontSendNotification);
-    masterVolLabel.setFont (juce::FontOptions (12.0f));
-    masterVolLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    masterVolLabel.setFont (labelFont (Metrics::fontLabelSmall));
+    masterVolLabel.setColour (juce::Label::textColourId, Palette::textSecondary);
     masterVolLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (masterVolLabel);
 
@@ -225,8 +227,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::MasterTune, masterTuneSlider);
 
     masterTuneLabel.setText ("Tune", juce::dontSendNotification);
-    masterTuneLabel.setFont (juce::FontOptions (12.0f));
-    masterTuneLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    masterTuneLabel.setFont (labelFont (Metrics::fontLabelSmall));
+    masterTuneLabel.setColour (juce::Label::textColourId, Palette::textSecondary);
     masterTuneLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (masterTuneLabel);
 
@@ -234,9 +236,6 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     regionCombo.addItem ("NTSC", 1);
     regionCombo.addItem ("PAL", 2);
     regionCombo.setTooltip ("Console region (affects frame timing and pitch tables)");
-    regionCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    regionCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    regionCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     addAndMakeVisible (regionCombo);
     regionAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::Region, regionCombo);
@@ -247,9 +246,6 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     midiModeCombo.addItem ("Mono", 3);
     midiModeCombo.addItem ("Layer", 4);
     midiModeCombo.setTooltip ("Split = per-channel MIDI, Auto = round-robin, Mono = single voice, Layer = all channels play every note");
-    midiModeCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    midiModeCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    midiModeCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     addAndMakeVisible (midiModeCombo);
     midiModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::MidiMode, midiModeCombo);
@@ -265,8 +261,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::VelocitySens, velocitySensSlider);
 
     velocitySensLabel.setText ("Vel", juce::dontSendNotification);
-    velocitySensLabel.setFont (juce::FontOptions (12.0f));
-    velocitySensLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    velocitySensLabel.setFont (labelFont (Metrics::fontLabelSmall));
+    velocitySensLabel.setColour (juce::Label::textColourId, Palette::textSecondary);
     velocitySensLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (velocitySensLabel);
 
@@ -281,8 +277,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         apvts, ParamIDs::PitchBendRange, pitchBendSlider);
 
     pitchBendLabel.setText ("Bend", juce::dontSendNotification);
-    pitchBendLabel.setFont (juce::FontOptions (12.0f));
-    pitchBendLabel.setColour (juce::Label::textColourId, Colors::textSecondary);
+    pitchBendLabel.setFont (labelFont (Metrics::fontLabelSmall));
+    pitchBendLabel.setColour (juce::Label::textColourId, Palette::textSecondary);
     pitchBendLabel.setJustificationType (juce::Justification::centredRight);
     addAndMakeVisible (pitchBendLabel);
 
@@ -290,9 +286,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     engineModeCombo.addItem ("Classic", 1);
     engineModeCombo.addItem ("Modern", 2);
     engineModeCombo.setTooltip ("Classic = 2A03 APU channels, Modern = polyphonic synth engine");
-    engineModeCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    engineModeCombo.setColour (juce::ComboBox::textColourId, Colors::fxBright);
-    engineModeCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
+    // Hot-tinted text marks the engine selector as the marquee control.
+    engineModeCombo.setColour (juce::ComboBox::textColourId, Palette::hotBright);
     addAndMakeVisible (engineModeCombo);
     engineModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (
         apvts, ParamIDs::EngineMode, engineModeCombo);
@@ -300,8 +295,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     // ─── VRC6 Toggle ─────────────────────────────────────────────────────
     vrc6Toggle.setButtonText ("VRC6");
     vrc6Toggle.setTooltip ("Enable VRC6 Konami expansion chip (3 extra channels)");
-    vrc6Toggle.setColour (juce::ToggleButton::textColourId, Colors::orangeAccent);
-    vrc6Toggle.setColour (juce::ToggleButton::tickColourId, Colors::orangeAccent);
+    vrc6Toggle.setColour (juce::ToggleButton::textColourId, Palette::vrc6Accent);
+    vrc6Toggle.setColour (juce::ToggleButton::tickColourId, Palette::vrc6Accent);
     vrc6Toggle.onClick = [this]
     {
         if (onVrc6Toggle)
@@ -318,9 +313,6 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     scaleCombo.addItem ("200%", 4);
     scaleCombo.setTooltip ("UI scale factor");
     scaleCombo.setSelectedId (1, juce::dontSendNotification);
-    scaleCombo.setColour (juce::ComboBox::backgroundColourId, Colors::bgLight);
-    scaleCombo.setColour (juce::ComboBox::textColourId, Colors::textPrimary);
-    scaleCombo.setColour (juce::ComboBox::outlineColourId, Colors::knobOutline);
     scaleCombo.onChange = [this]
     {
         static constexpr float scales[] = { 1.0f, 1.25f, 1.5f, 2.0f };
@@ -331,8 +323,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
     addAndMakeVisible (scaleCombo);
 
     // ─── MIDI Info Button ────────────────────────────────────────────────
-    midiInfoButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
-    midiInfoButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    midiInfoButton.setColour (juce::TextButton::buttonColourId, Palette::surfaceHi);
+    midiInfoButton.setColour (juce::TextButton::textColourOffId, Palette::textSecondary);
     midiInfoButton.setTooltip ("Show MIDI CC mapping reference");
     midiInfoButton.onClick = [this]
     {
@@ -377,9 +369,9 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
         info += "\n\nTo learn a CC: click Learn 1-4, then turn a MIDI knob.";
 
         auto* popup = new juce::AlertWindow ("MIDI CC Mappings", "", juce::MessageBoxIconType::NoIcon);
-        popup->setColour (juce::AlertWindow::backgroundColourId, Colors::bgMid);
-        popup->setColour (juce::AlertWindow::textColourId, Colors::textPrimary);
-        popup->setColour (juce::AlertWindow::outlineColourId, Colors::knobOutline);
+        popup->setColour (juce::AlertWindow::backgroundColourId, Palette::surface);
+        popup->setColour (juce::AlertWindow::textColourId, Palette::textPrimary);
+        popup->setColour (juce::AlertWindow::outlineColourId, Palette::outline);
         popup->addTextBlock (info);
         popup->addButton ("Learn 1", 1);
         popup->addButton ("Learn 2", 2);
@@ -397,8 +389,8 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
 
     // ─── Audio/MIDI Settings (Standalone only) ──────────────────────────
     audioSettingsButton.setButtonText ("Settings");
-    audioSettingsButton.setColour (juce::TextButton::buttonColourId, Colors::bgLight);
-    audioSettingsButton.setColour (juce::TextButton::textColourOffId, Colors::textSecondary);
+    audioSettingsButton.setColour (juce::TextButton::buttonColourId, Palette::surfaceHi);
+    audioSettingsButton.setColour (juce::TextButton::textColourOffId, Palette::textSecondary);
     audioSettingsButton.setTooltip ("Audio & MIDI device settings");
     audioSettingsButton.onClick = [this]
     {
@@ -410,7 +402,7 @@ TopBarComponent::TopBarComponent (CartridgeProcessor& processor,
 
     // ─── A/B Comparison ─────────────────────────────────────────────────
     styleBtn(abButton);
-    abButton.setColour(juce::TextButton::textColourOffId, Colors::fxBright);
+    abButton.setColour(juce::TextButton::textColourOffId, Palette::hotBright);
     abButton.setTooltip ("Toggle A/B comparison (stores two parameter states)");
     abButton.onClick = [this]
     {
@@ -575,7 +567,6 @@ void TopBarComponent::mouseDoubleClick (const juce::MouseEvent&)
 
 void TopBarComponent::paint (juce::Graphics& g)
 {
-    using namespace cart::ui;
     auto bounds = getLocalBounds().toFloat();
 
     // Two-tone vertical gradient — slightly lighter at top for the
