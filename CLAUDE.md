@@ -70,6 +70,17 @@ All ~190 parameters defined in `src/Parameters.h` (IDs) and `src/Parameters.cpp`
 
 `CartridgeEditor` stacks components vertically: TopBar → Waveform → ChannelStrips/ModernPanel → ModulationBar → EffectsBar → StatusBar → Keyboard. The FX and Mod bars are accordion-style (mutually exclusive expansion). A minimum channel strip height (240px) is enforced so bottom panels never crush the channel controls. The layout fills the full window bounds — scaling options are 100%, 125%, 150%, 200%. First launch auto-detects the best scale for the display. In macOS fullscreen the content stretches to fill the screen.
 
+### UI Design System (`src/ui/`)
+
+A header-only toolkit defines the look across every component:
+
+- **`Theme.h`** — `cart::ui::Palette` (NES-red `primary`, bone-cream `secondary`, bright `hot`, Konami-orange `vrc6Accent`, surface and text tiers) plus `Metrics` (cornerRadius, knobStrokeWidth, hitTargetMin) and font helpers (`displayFont`/`labelFont`/`monoFont`). Single source of truth for colours.
+- **`CartridgeLookAndFeel.h`** — registered globally on `CartridgeEditor`. Renders rotary knobs (1.2π–2.8π arc, bipolar fill from centre for ± params, bone pointer + pivot dot), linear sliders (h/v/bar), toggles, combos, popup menus, and button backgrounds. Per-control colour overrides should be avoided so the LnF stays in charge.
+- **`components/{KnobControl,ChoiceControl,ToggleControl}.h`** — APVTS-bound drop-in components for new code. `KnobControl` includes a stepper popup (right-click for choice list).
+- **`Colors.h`** — legacy compatibility shim that forwards `cart::Colors::*` names to the new `cart::ui::Palette`. Existing components still reference the old names; new code should use `Palette` directly.
+
+FX/Mod accordion detail panels are 120px tall and lay knobs out as horizontal columns of `[label / rotary / value-below]`, centred when there's slack. ModernPanel uses rotary knobs at 56px diameter inside its three sections (Oscillators / Envelope / Global). Channel strips keep horizontal sliders because the 8-strip layout is too narrow for rotaries — the LnF still upgrades the rendering.
+
 ### Thread Safety
 
 - Audio thread reads `std::atomic<float>*` from APVTS, writes to `channelActive[8]`, `seqPlaybackStep[8]`, `waveformBuffer`

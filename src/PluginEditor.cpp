@@ -15,6 +15,8 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
       statusBar (p),
       keyboard (p.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
+    setLookAndFeel (&lookAndFeel);
+
     // Wire up VRC6 toggle from top bar to channel strip area
     topBar.onVrc6Toggle = [this] (bool visible)
     {
@@ -77,7 +79,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
             juce::DialogWindow::LaunchOptions o;
             o.content.setOwned (content.release());
             o.dialogTitle = "Audio/MIDI Settings";
-            o.dialogBackgroundColour = cart::Colors::bgMid;
+            o.dialogBackgroundColour = cart::ui::Palette::surface;
             o.escapeKeyTriggersCloseButton = true;
             o.useNativeTitleBar = true;
             o.resizable = false;
@@ -115,21 +117,21 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
 
     // Style the keyboard
     keyboard.setColour (juce::MidiKeyboardComponent::whiteNoteColourId,
-                        cart::Colors::keyWhite);
+                        cart::ui::Palette::keyWhite);
     keyboard.setColour (juce::MidiKeyboardComponent::blackNoteColourId,
-                        cart::Colors::keyBlack);
+                        cart::ui::Palette::keyBlack);
     keyboard.setColour (juce::MidiKeyboardComponent::keySeparatorLineColourId,
-                        cart::Colors::bgDark);
+                        cart::ui::Palette::background);
     keyboard.setColour (juce::MidiKeyboardComponent::keyDownOverlayColourId,
-                        cart::Colors::keyDown.withAlpha (0.6f));
+                        cart::ui::Palette::keyDown.withAlpha (0.6f));
     keyboard.setColour (juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId,
-                        cart::Colors::accentDim.withAlpha (0.3f));
+                        cart::ui::Palette::primaryDim.withAlpha (0.3f));
     keyboard.setColour (juce::MidiKeyboardComponent::shadowColourId,
-                        cart::Colors::bgDark);
+                        cart::ui::Palette::background);
     keyboard.setColour (juce::MidiKeyboardComponent::upDownButtonBackgroundColourId,
-                        cart::Colors::bgMid);
+                        cart::ui::Palette::surface);
     keyboard.setColour (juce::MidiKeyboardComponent::upDownButtonArrowColourId,
-                        cart::Colors::textPrimary);
+                        cart::ui::Palette::textPrimary);
     keyboard.setKeyWidth (24.0f);
     keyboard.setMidiChannel (1);
     keyboard.setAvailableRange (36, 96); // C2 to C7 (~5 octaves)
@@ -191,7 +193,7 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
         if (auto* docWindow = dynamic_cast<juce::DocumentWindow*> (safeThis->getTopLevelComponent()))
         {
             docWindow->setColour (juce::ResizableWindow::backgroundColourId,
-                                  cart::Colors::bgDark);
+                                  cart::ui::Palette::background);
             docWindow->setUsingNativeTitleBar (true);
 
             if (auto* peer = docWindow->getPeer())
@@ -208,7 +210,10 @@ CartridgeEditor::CartridgeEditor (CartridgeProcessor& p)
     });
 }
 
-CartridgeEditor::~CartridgeEditor() = default;
+CartridgeEditor::~CartridgeEditor()
+{
+    setLookAndFeel (nullptr);
+}
 
 juce::File CartridgeEditor::getSettingsFile() const
 {
@@ -279,7 +284,21 @@ void CartridgeEditor::saveScalePreference()
 
 void CartridgeEditor::paint (juce::Graphics& g)
 {
-    g.fillAll (cart::Colors::bgDark);
+    using namespace cart::ui;
+    auto bounds = getLocalBounds().toFloat();
+
+    // Subtle vertical gradient — slightly lighter at the top so the
+    // top bar feels like a "control surface" and the keyboard reads
+    // as a foot rest rather than identical-flat.
+    g.setGradientFill (juce::ColourGradient (
+        Palette::background.brighter (0.04f), 0.0f, 0.0f,
+        Palette::background.darker (0.10f),  0.0f, bounds.getHeight(),
+        false));
+    g.fillRect (bounds);
+
+    // Hairline divider under the top bar
+    g.setColour (Palette::primary.withAlpha (0.35f));
+    g.fillRect (0, topBarHeight - 1, getWidth(), 1);
 }
 
 void CartridgeEditor::resized()

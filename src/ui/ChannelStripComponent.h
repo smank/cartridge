@@ -3,7 +3,7 @@
 #include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Colors.h"
+#include "Theme.h"
 
 namespace cart {
 
@@ -29,6 +29,9 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
     void timerCallback() override;
 
     ChannelType getChannelType() const { return channelType; }
@@ -131,6 +134,11 @@ private:
     // Activity LED
     std::atomic<bool>* activityFlag = nullptr;
     bool ledState = false;
+
+    // Header click & hover state
+    bool headerHovered = false;
+    static constexpr int headerHeight  = cart::ui::Metrics::channelHeaderHeight;
+    static constexpr int ledClickWidth = cart::ui::Metrics::channelHeaderLedHit;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChannelStripComponent)
 };

@@ -2,7 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Colors.h"
+#include "Theme.h"
 
 namespace cart {
 
@@ -15,7 +15,9 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
-    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDown  (const juce::MouseEvent&) override;
+    void mouseMove  (const juce::MouseEvent&) override;
+    void mouseExit  (const juce::MouseEvent&) override;
     void timerCallback() override;
 
     int getDesiredHeight() const;
@@ -23,18 +25,31 @@ public:
 
     std::function<void()> onHeightChanged;
 
-    static constexpr int headerHeight = 32;
-    static constexpr int detailHeight = 100;
+    static constexpr int headerHeight = 40;
+    static constexpr int detailHeight = 140;
 
 private:
     enum EffectIndex { FX_CRUSH = 0, FX_FILTER, FX_CHORUS, FX_DELAY, FX_REVERB, NUM_FX };
+
+    // LED toggles are painted manually in paint(); this LookAndFeel
+    // suppresses the default toggle painting so the buttons remain
+    // invisible while still being focusable and keyboard-accessible.
+    class InvisibleToggleLAF : public juce::LookAndFeel_V4
+    {
+    public:
+        void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool, bool) override {}
+    };
+
+    InvisibleToggleLAF invisibleToggleLaf;
 
     void toggleExpand (int fxIndex);
     void styleKnob (juce::Slider& knob);
     void layoutDetailKnobs (juce::Rectangle<int> area, int fxIndex);
     void setDetailVisible (int fxIndex, bool visible);
+    void configureLedToggle (juce::ToggleButton& toggle, const juce::String& tooltip);
 
     int expandedEffect = -1;
+    int hoveredSection = -1;
 
     // ─── BitCrush ──────────────────────────────────────────────────────
     juce::ToggleButton bcEnable;

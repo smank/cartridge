@@ -2,7 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
-#include "Colors.h"
+#include "Theme.h"
 #include "StepSequencerComponent.h"
 
 class CartridgeProcessor;
@@ -18,7 +18,9 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
-    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDown  (const juce::MouseEvent&) override;
+    void mouseMove  (const juce::MouseEvent&) override;
+    void mouseExit  (const juce::MouseEvent&) override;
     void timerCallback() override;
 
     int getDesiredHeight() const;
@@ -27,20 +29,34 @@ public:
     std::function<void()> onHeightChanged;
     std::function<void(const juce::File&)> onDpcmLoad;
 
-    static constexpr int headerHeight = 32;
-    static constexpr int detailHeight = 100;
+    static constexpr int headerHeight = 40;
+    static constexpr int detailHeight = 140;
 
 private:
     enum ModIndex { MOD_LFO = 0, MOD_PORTA, MOD_ARP, MOD_DPCM, MOD_SEQ, NUM_MOD };
 
     static constexpr int seqDetailHeight = 140;
 
+    // LookAndFeel that paints nothing — used for the LED toggle buttons in
+    // section headers. The painted LED comes from this component's paint(),
+    // so the toggle itself only needs to provide hit testing and focus.
+    struct InvisibleToggleLAF : juce::LookAndFeel_V4
+    {
+        void drawToggleButton (juce::Graphics&, juce::ToggleButton&,
+                               bool /*shouldDrawButtonAsHighlighted*/,
+                               bool /*shouldDrawButtonAsDown*/) override {}
+    };
+
     void toggleExpand (int modIndex);
     void styleKnob (juce::Slider& knob);
     void layoutDetailKnobs (juce::Rectangle<int> area, int modIndex);
     void setDetailVisible (int modIndex, bool visible);
+    void configureLedToggle (juce::ToggleButton& toggle, const juce::String& tooltipText);
+
+    InvisibleToggleLAF invisibleToggleLaf;
 
     int expandedMod = -1;
+    int hoveredSection = -1;
 
     // ─── LFO ────────────────────────────────────────────────────────────
     juce::ToggleButton lfoEnable;

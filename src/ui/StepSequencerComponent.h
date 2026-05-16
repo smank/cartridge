@@ -2,7 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../dsp/StepSequencer.h"
-#include "Colors.h"
+#include "Theme.h"
 #include <functional>
 #include <atomic>
 
